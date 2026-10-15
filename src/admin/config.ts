@@ -23,7 +23,6 @@ import type { CmsConfig } from '@sveltia/cms';
 // Deployment constants — keep in sync with .github/workflows/deploy.yml
 // ---------------------------------------------------------------------------
 const GITHUB_REPO = 'smagara/SlowDoughPizzaSite_Sveltia';
-const PRODUCTION_BRANCH = 'main';
 const SITE_URL = 'https://smagara.github.io/SlowDoughPizzaSite_Sveltia/';
 
 /**
@@ -101,7 +100,11 @@ export const config: CmsConfig = {
   backend: {
     name: 'github',
     repo: GITHUB_REPO,
-    branch: PRODUCTION_BRANCH,
+    // `branch` is deliberately NOT set: Sveltia then detects and edits the repository's *default*
+    // branch. A hard-coded name that differs from where the content lives (e.g. `main` vs an
+    // older `master`) makes the editor silently show empty collections, because it reads a
+    // branch without `content/`. The deploy workflow publishes `main`, so keep `main` as the
+    // default branch (Settings → General → Default branch) — see README "Troubleshooting".
     auth_scope: 'repo',
     ...(OAUTH_BASE_URL
       ? { base_url: OAUTH_BASE_URL, auth_endpoint: 'auth', auth_methods: ['oauth', 'token'] }

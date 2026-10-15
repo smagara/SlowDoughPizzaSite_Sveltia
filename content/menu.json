@@ -139,6 +139,31 @@
           ]
         }
       ]
+    },
+    {
+      "title": "Alcohol",
+      "subtitle": "Gettin tipsy",
+      "items": [
+        {
+          "name": "buffalotrace",
+          "italianName": "Buffalo a Trace a",
+          "description": "Nice bourbon",
+          "price": 22,
+          "tags": [
+            "Gluten-Free"
+          ]
+        },
+        {
+          "name": "firewater",
+          "italianName": "Acqua del fuoco",
+          "description": "Straight up grain alcohol",
+          "price": 9.99,
+          "tags": [
+            "Seasonal",
+            "Gluten-Free"
+          ]
+        }
+      ]
     }
   ]
 }

@@ -105,7 +105,7 @@ TABLE(["Item", "Value"], [
     ["Repository", "https://github.com/smagara/SlowDoughPizzaSite_Sveltia"],
     ["Live site", "https://smagara.github.io/SlowDoughPizzaSite_Sveltia/"],
     ["Content editor", "https://smagara.github.io/SlowDoughPizzaSite_Sveltia/admin/ (hidden ✎ link in the site footer)"],
-    ["Document version", "1.0 — " + datetime.date.today().strftime("%d %B %Y")],
+    ["Document version", "1.1 — " + datetime.date.today().strftime("%d %B %Y") + " (1.0: initial design; 1.1: default-branch detection after the “empty editor” finding, build diagnostics, e2e hardening — see §16)"],
     ["Status", "Prototype — implemented and verified offline with an end-to-end test; production sign-in (OAuth helper) and branch protection require one-time owner setup (§12)"],
     ["Audience", "Site owner, developers maintaining the site, reviewers of content pull requests"],
     ["Companion document", "Manager Quick Guide (docs/Manager-Quick-Guide.pdf) — 2-page instructions for the pizza manager"],
@@ -114,7 +114,7 @@ doc.add_page_break()
 
 # ================================================================== TOC placeholder
 H("Contents")
-P("1. Introduction · 2. Requirements and traceability · 3. Solution overview · 4. Content model · 5. The editor (Sveltia CMS) · 6. Authentication and authorisation · 7. Editorial workflow: from Save to pull request · 8. Build and deployment (CI/CD) · 9. Input validation and security · 10. Local edit mode for development · 11. Testing strategy · 12. Setup and operations runbook · 13. Design decisions log · 14. Open questions · 15. Risks and mitigations · Appendix A: File inventory · Appendix B: Editor screenshots", size=10)
+P("1. Introduction · 2. Requirements and traceability · 3. Solution overview · 4. Content model · 5. The editor (Sveltia CMS) · 6. Authentication and authorisation · 7. Editorial workflow: from Save to pull request · 8. Build and deployment (CI/CD) · 9. Input validation and security · 10. Local edit mode for development · 11. Testing strategy · 12. Setup and operations runbook · 13. Design decisions log · 14. Open questions · 15. Risks and mitigations · 16. Revision history · Appendix A: File inventory · Appendix B: Editor screenshots", size=10)
 doc.add_page_break()
 
 # ================================================================== 1
@@ -216,7 +216,7 @@ P("GitHub Pages is static, so an OAuth flow needs a small external helper to exc
 B("**Sign in with GitHub (OAuth)** — recommended. Uses the official Sveltia CMS Authenticator deployed as a Cloudflare Worker (free tier), referenced by `backend.base_url`. The URL is injected at build time from the repository variable CMS_OAUTH_BASE_URL. If the variable is unset the button is not shown at all, so the site never ships a broken sign-in.")
 B("**Sign in using access token** — zero infrastructure fallback. The manager creates a fine-grained personal access token scoped to this single repository with Contents: read/write and Pull requests: read/write (the dialog links to a pre-filled GitHub form) and pastes it once; Sveltia stores it in the browser's local storage.")
 H("6.2 Authorisation: collaborators only", 2)
-P("After sign-in Sveltia loads the user profile and calls GET /repos/smagara/SlowDoughPizzaSite_Sveltia/collaborators/{login}. Anyone who is not a collaborator is stopped with “You don't have access to the repository” before any content is loaded (verified in e2e scenario 2). This check is a convenience; the real enforcement is GitHub itself: every branch creation, commit and pull-request call is made with the user's own token and is rejected by GitHub unless that account has write permission on the repository. There is no shared service account and no way to act as somebody else.")
+P("After sign-in Sveltia loads the user profile, detects the repository's default branch (GraphQL defaultBranchRef) and calls GET /repos/smagara/SlowDoughPizzaSite_Sveltia/collaborators/{login}. Anyone who is not a collaborator is stopped with “You don't have access to the repository” before any content is loaded (verified in e2e scenario 2). This check is a convenience; the real enforcement is GitHub itself: every branch creation, commit and pull-request call is made with the user's own token and is rejected by GitHub unless that account has write permission on the repository. There is no shared service account and no way to act as somebody else.")
 H("6.3 What a collaborator can and cannot do", 2)
 B("Can: read all files in the repository (it is public anyway), create and update branches named cms/…, open pull requests, change their labels and mark them ready for review.")
 B("Cannot from the editor: merge to main. The Publish control is disabled for every collection (`publish: false`), and branch protection on main (§12) requires a pull request with an approval and a green status check even for users with write access. Open Authoring (editing from forks) is off, so outsiders cannot even propose changes through the editor.")
@@ -236,6 +236,7 @@ TABLE(["Step", "What happens", "Where"], [
 ], widths=[1.3, 12, 3.2], font=9)
 H("7.1 Conventions", 2)
 TABLE(["Item", "Value"], [
+    ["Base branch", "The repository's default branch, detected by Sveltia at sign-in (`backend.branch` is intentionally not set — see D15). It must be `main`, which is what the workflows build and deploy."],
     ["Branch name", "cms/<collection>/<slug>, e.g. cms/site/menu, cms/blog/harvest-special-pumpkin-sage. One branch (and one PR) per entry; further saves of the same entry add commits to the same branch."],
     ["PR title / commit message", "content: add|update|remove <Collection label> “<slug>” (configured in `backend.commit_messages`)"],
     ["PR body", "“Automatically generated by Sveltia CMS”"],
@@ -259,7 +260,12 @@ P("A GitHub project site is served from https://smagara.github.io/SlowDoughPizza
 H("8.2 Build-time inputs", 2)
 B("BASE_PATH — Pages sub-path (workflows only).")
 B("VITE_CMS_OAUTH_BASE_URL — from the repository variable CMS_OAUTH_BASE_URL; optional (§6.1).")
-H("8.3 Timing and failure behaviour", 2)
+H("8.3 Build output notes", 2)
+P("Two messages can appear in the build log; neither indicates a problem, and both were reviewed during the first deployment:")
+B("**“Some chunks are larger than 500 kB after minification”** — the editor entry (dist/assets/admin-*.js, ≈2.1 MB minified / 650 kB gzipped) bundles Sveltia CMS, a pre-built single-page application whose optional features (syntax highlighting languages, image codecs, maps, locales) are already emitted as lazily loaded chunks. It cannot be split further from this project. `build.chunkSizeWarningLimit` is set to 2 600 kB in vite.config.ts so the warning stays meaningful for the public site, whose chunk is ≈400 kB. The public page never loads the editor bundle.")
+B("**“[PLUGIN_TIMINGS] JavaScript callbacks ran for …”** — an informational diagnostic of Rolldown, the bundler inside Vite 8, reporting how much build time was spent inside JavaScript plugin hooks (on the reporting machine 1.5 s of 9.5 s). The project's two plugins now declare hook filters (the Markdown plugin only runs for content/**/*.md, the CSP plugin only for the public index.html), so they add no per-module overhead; the remaining time is the React and Tailwind plugins, which is normal. The note about “callbacks listed without a time … overlapped” is part of the same diagnostic. It can be profiled with `node --cpu-prof` if it ever grows.")
+P("The previous “Your Vite config uses features that are unsupported by configLoader: 'native'” notice was removed by using import.meta.dirname and explicit .ts extensions in vite.config.ts.")
+H("8.4 Timing and failure behaviour", 2)
 P("A typical deploy completes in 2–3 minutes. If validation or the build fails on main (which should be impossible once the PR check is required), nothing is deployed and the previous version stays live. Re-running the workflow manually (workflow_dispatch) is supported.")
 
 # ================================================================== 9
@@ -313,13 +319,15 @@ TABLE(["#", "Scenario", "Asserts"], [
     ["7", "Local repository mode", "Opening hours written to the working copy; no GitHub request made"],
     ["8", "Production build served at the GitHub Pages URL", "Base-path-correct hidden link and logo; CSP present with no violations; no local-mode button off localhost; sign-in works"],
 ], widths=[0.8, 6, 9.7], font=8.5)
-P("Run with `npm run test:e2e` (needs `npx playwright install chromium` once). The test also writes the screenshots used in this document and in the manager guide (docs/images/cms/). Static checks: `npm run lint` type-checks the site, the Vite plugins and the CMS configuration; `npm run validate:content` validates the committed content. Both run in CI.")
+P("Run with `npm run test:e2e`. npm install brings the Playwright package but not the browser binary; run `npm run test:e2e:setup` (= `npx playwright install chromium`) once — the test prints this hint and exits if Chromium is missing. The test also writes the screenshots used in this document and in the manager guide (docs/images/cms/). Static checks: `npm run lint` type-checks the site, the Vite plugins and the CMS configuration; `npm run validate:content` validates the committed content. Both run in CI.")
+P("Robustness notes from the first external run: scenario 5 originally typed the essay into the rich-text editor with simulated keystrokes. On a slower machine the editor's own “## → heading” conversion raced with the keystrokes (the non-ASCII “°” character is inserted through a different input path) and characters were lost, so the scenario failed intermittently. It now switches the field to raw Markdown mode (“Edit in Markdown” toolbar button) and sets the whole body with a single fill(), then switches back for the screenshot. All waits are on observable state (simulated API calls, file contents) rather than on transient toasts.")
 P("Not covered automatically: the real OAuth round-trip (needs the deployed worker), GitHub's branch-protection behaviour, and the Actions workflows themselves (validated by review and by running the same npm scripts locally). These are listed as post-deployment checks in §12.")
 
 # ================================================================== 12
 H("12. Setup and operations runbook")
 H("12.1 One-time setup (owner)", 2)
-N("Push this repository to GitHub (default branch main). In Settings → Pages set Build and deployment → Source to GitHub Actions. The deploy workflow publishes the site on the next push.")
+N("Make sure the repository's default branch is main and that it contains the content/ folder (Settings → General → Default branch; rename master if necessary). The editor always edits the default branch; the workflows build and deploy main. A mismatch is the one misconfiguration the editor does not report: it simply shows empty collections (§15).")
+N("Push this repository to GitHub. In Settings → Pages set Build and deployment → Source to GitHub Actions. The deploy workflow publishes the site on the next push.")
 N("Add the manager as a collaborator with Write permission (Settings → Collaborators). Remove the collaborator to revoke editor access.")
 N("Protect main (Settings → Branches or Rules): require a pull request before merging, require 1 approval, require the status check “Validate & build (PR)”, block force pushes. Optionally require conversation resolution. Enable Settings → General → Automatically delete head branches.")
 N("Choose the sign-in method. Token mode works immediately. For “Sign in with GitHub”: create a GitHub OAuth App (Homepage URL = site URL; Authorization callback URL = https://<worker>.workers.dev/callback); deploy sveltia/sveltia-cms-auth to Cloudflare Workers with GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET and ALLOWED_DOMAINS=smagara.github.io (add localhost:3000 for local testing); add the repository variable CMS_OAUTH_BASE_URL=https://<worker>.workers.dev; re-run the deploy workflow.")
@@ -333,6 +341,7 @@ TABLE(["Task", "How"], [
     ["Add a new editable field", "Add the field to config.ts, the type in src/types.ts, the loader in src/content/index.ts and the component; the validator picks the rule up automatically."],
     ["Upgrade Sveltia CMS", "`npm update @sveltia/cms`, run `npm run check` and `npm run test:e2e`, deploy."],
     ["Manager lost their token / new manager", "Token mode: create a new fine-grained token (Contents + Pull requests read/write on this repo). OAuth mode: nothing to do beyond collaborator access."],
+    ["Editor shows no existing content (Blog Posts 0, empty fields) but can create items", "The branch the editor reads has no content/ folder. Check which branch holds content/ and make it the default branch (must be main for deployment). If the branch is right, clear a stale editor cache: sign out, clear site data for the editor URL, sign in again."],
 ], widths=[4.5, 12], font=9)
 
 # ================================================================== 13
@@ -352,6 +361,7 @@ TABLE(["ID", "Decision", "Alternatives considered", "Rationale / consequences"],
     ["D12", "Opening Hours added as a fourth editable item", "Only the three items named in the brief", "Natural routine update; cheap to add; demonstrates locked-structure lists"],
     ["D13", "Offline e2e test with a simulated GitHub API and fake file system", "Manual testing only; tests against a real sandbox repository", "Deterministic, runs anywhere, proves the PR mechanics and produces documentation screenshots; real-GitHub checks listed in the runbook"],
     ["D14", "GitHub Actions with separate PR-check and deploy workflows; BASE_PATH from the repository name", "Single workflow; hard-coded base path", "Clear required check for branch protection; works if the repository is renamed/forked"],
+    ["D15", "Do not set `backend.branch`; let Sveltia detect the repository's default branch (v1.1)", "Hard-code `branch: main` (v1.0)", "v1.0 hard-coded main. In the first real deployment the editor showed empty collections while saving still worked — reproduced in the simulation as “configured branch has no content/”: Sveltia reports nothing in that case. Following the default branch removes the silent mismatch; the requirement that the default branch is main (for deployment) is now a documented, visible setup step instead of a hidden assumption."],
 ], widths=[0.9, 4.6, 4.3, 6.7], font=8)
 
 # ================================================================== 14
@@ -372,6 +382,7 @@ for q in [
 # ================================================================== 15
 H("15. Risks and mitigations")
 TABLE(["Risk", "Impact", "Mitigation"], [
+    ["Editor reads a branch without content/ (default branch ≠ branch with content, or stale main)", "Editor shows empty collections with no error; new entries would be proposed against the wrong baseline", "Editor follows the default branch (D15); setup step 0 and troubleshooting entry; symptom reproduced and documented"],
     ["Editor bypasses browser validation (hand-edited commit)", "Unsafe or malformed content reaches a PR", "CI validator (required check) + review + safe rendering + CSP"],
     ["Sveltia CMS upgrade changes behaviour (e.g. API usage)", "Editor breaks", "Version pinned; e2e test and `npm run check` before upgrading; simulated API makes regressions visible"],
     ["GitHub API outage or rate limit", "Editor cannot load/save", "Sveltia shows GitHub status on the login page; changes are retried by the user; nothing is lost on the site"],
@@ -380,6 +391,13 @@ TABLE(["Risk", "Impact", "Mitigation"], [
     ["Large Sveltia bundle (~17 MB of mostly lazy-loaded assets)", "Slower first load of the editor", "Assets are code-split and cached; public site is unaffected (separate entry)"],
     ["Token leakage from the manager's browser", "Unauthorised commits/PRs as the manager", "Fine-grained, single-repo, expiring token; branch protection still requires review; revoke on GitHub"],
 ], widths=[5, 3.8, 7.7], font=9)
+
+# ================================================================== 16
+H("16. Revision history")
+TABLE(["Version", "Change", "Trigger"], [
+    ["1.0", "Initial design and implementation.", "—"],
+    ["1.1", "`backend.branch` removed so the editor follows the repository's default branch (D15); runbook step 0 and troubleshooting entry added (§12, §15). Build log reviewed: chunk-size limit raised for the editor bundle, hook filters added to the project's Vite plugins, config-loader notice fixed (§8.3). End-to-end test: raw-Markdown input instead of simulated keystrokes, explicit browser-setup script and hint (§11).", "First external deployment and test run: editor showed no existing data although creating entries and the pull request worked; two build warnings; one flaky scenario; Playwright browser not installed."],
+], widths=[1.6, 10, 4.9], font=9)
 
 # ================================================================== Appendix A
 doc.add_page_break()

@@ -1,9 +1,9 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import path from 'path';
+import path from 'node:path';
 import {defineConfig} from 'vite';
-import markdownContent from './tools/vite-plugin-markdown-content';
-import contentSecurityPolicy from './tools/vite-plugin-csp';
+import markdownContent from './tools/vite-plugin-markdown-content.ts';
+import contentSecurityPolicy from './tools/vite-plugin-csp.ts';
 
 export default defineConfig(() => {
   return {
@@ -13,18 +13,23 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss(), markdownContent(), contentSecurityPolicy()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname, '.'),
       },
     },
     build: {
       rollupOptions: {
         input: {
           // Public site
-          main: path.resolve(__dirname, 'index.html'),
+          main: path.resolve(import.meta.dirname, 'index.html'),
           // Sveltia CMS editor (hidden link in the footer → /admin/)
-          admin: path.resolve(__dirname, 'admin/index.html'),
+          admin: path.resolve(import.meta.dirname, 'admin/index.html'),
         },
       },
+      // The editor entry bundles Sveltia CMS, a pre-built ~2 MB single-page app that cannot be
+      // split further from here (its own sub-features are already lazy-loaded chunks). Raising
+      // the limit keeps the "chunks are larger than 500 kB" warning from hiding real problems;
+      // the public site's own chunk stays well under the default 500 kB.
+      chunkSizeWarningLimit: 2600,
     },
     server: {
       // HMR is disabled via the DISABLE_HMR environment variable.

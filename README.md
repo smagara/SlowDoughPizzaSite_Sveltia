@@ -65,11 +65,17 @@ npm run check              # lint + validate + build
 `npm run test:e2e` drives the real editor in headless Chromium against an in-process **simulated
 GitHub API** (`tests/e2e/github-mock.mjs`) and a fake local file system, so the whole
 branch → commit → pull request → "send for review" flow is verified without network access. It also
-refreshes the screenshots in `docs/images/cms/`. Requires a Playwright browser:
-`npx playwright install chromium`.
+refreshes the screenshots in `docs/images/cms/`.
+
+> **First run:** the Playwright *package* is installed by `npm install`, but the browser binary is
+> not. Run `npm run test:e2e:setup` once (= `npx playwright install chromium`, ~150 MB); the test
+> prints this hint if the browser is missing.
 
 ## One-time repository setup (owner)
 
+0. **Default branch = `main`.** The editor edits the repository's *default* branch (Sveltia detects
+   it), while the workflows build and deploy `main`. If the repository still uses `master`, rename
+   it (*Settings → General → Default branch*) before going further.
 1. **GitHub Pages** — *Settings → Pages → Build and deployment → Source:* **GitHub Actions**.
    The first push to `main` deploys the site.
 2. **Editors** — add the manager as a **collaborator** with *Write* permission
@@ -103,6 +109,18 @@ refreshes the screenshots in `docs/images/cms/`. Requires a Playwright browser:
    exact text diff.
 3. **Approve** and **Squash and merge**. The *Deploy to GitHub Pages* workflow publishes the
    change within a couple of minutes.
+
+## Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| The editor opens but **shows no existing content** — Blog Posts "0", Site Content files listed with empty fields, creating new items still works. | The editor is reading a branch that does not contain `content/`. Sveltia shows no error in this case. Check which branch holds `content/` on GitHub and make it the **default branch** (the editor follows the default branch; the deploy workflow publishes `main`, so that should be `main`). If the branch is right, clear a stale cache: sign out, then in the browser clear site data for the editor URL and sign in again. |
+| "You don't have access to the repository." | The GitHub account is not a collaborator with write access. |
+| "The branch has moved since the site data was loaded." | Someone committed to the branch meanwhile; reload the editor and redo the change. |
+| A change is merged but the site did not update. | Check the *Deploy to GitHub Pages* run under *Actions*; the merge must land on `main` and Pages must be set to *GitHub Actions*. |
+| `npm run build` prints "chunks are larger than 500 kB". | Expected for the editor entry (Sveltia CMS is a pre-built ~2 MB app; its sub-features are lazy chunks). `build.chunkSizeWarningLimit` is raised in `vite.config.ts` so the warning only fires for real regressions. |
+| `npm run build` prints `[PLUGIN_TIMINGS] JavaScript callbacks ran for …`. | An informational diagnostic from Rolldown (Vite 8's bundler) about time spent in JavaScript plugins — it is not an error. The project's own plugins use hook filters so they only run for the files they handle; the remaining time is the React and Tailwind plugins. Profile with `node --cpu-prof` if it grows. |
+| `npm run test:e2e` fails to start with a browser error. | Run `npm run test:e2e:setup` once. |
 
 ## Project layout
 

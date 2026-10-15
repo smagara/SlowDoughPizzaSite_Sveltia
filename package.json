@@ -11,7 +11,8 @@
     "lint": "tsc --noEmit",
     "validate:content": "node --experimental-strip-types scripts/validate-content.ts",
     "test:e2e": "node --experimental-strip-types tests/e2e/cms-workflow.test.mjs",
-    "check": "npm run lint && npm run validate:content && npm run build"
+    "check": "npm run lint && npm run validate:content && npm run build",
+    "test:e2e:setup": "playwright install chromium"
   },
   "dependencies": {
     "lucide-react": "^0.546.0",

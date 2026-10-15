@@ -42,13 +42,17 @@ export default function markdownContent(): Plugin {
   return {
     name: 'slow-dough:markdown-content',
     enforce: 'pre',
-    transform(code, id) {
-      if (!id.endsWith('.md') || !/[\\/]content[\\/]/.test(id)) return null;
-      const mod = parseMarkdownFile(code, id);
-      return {
-        code: `export default ${JSON.stringify(mod)};`,
-        map: null,
-      };
+    transform: {
+      // Hook filter: the bundler only invokes this callback for *.md files under content/, so the
+      // plugin adds no per-module JavaScript overhead for the ~2,000 other modules in the build.
+      filter: { id: /[\\/]content[\\/].*\.md$/ },
+      handler(code, id) {
+        const mod = parseMarkdownFile(code, id);
+        return {
+          code: `export default ${JSON.stringify(mod)};`,
+          map: null,
+        };
+      },
     },
   };
 }

@@ -137,7 +137,15 @@ await vite.listen();
 const baseUrl = `http://127.0.0.1:${vite.config.server.port}`;
 console.log(`Site: ${baseUrl}\n`);
 
-const browser = await chromium.launch({ headless: HEADLESS });
+let browser;
+try {
+  browser = await chromium.launch({ headless: HEADLESS });
+} catch (error) {
+  await vite.close();
+  console.error(`\nCould not launch Chromium: ${error.message.split('\n')[0]}`);
+  console.error('Install the Playwright browser once with:  npm run test:e2e:setup   (= npx playwright install chromium)\n');
+  process.exit(2);
+}
 
 try {
   // ------------------------------------------------------------------ 1. login page
@@ -279,17 +287,25 @@ try {
     await page.getByLabel('Excerpt').locator('textarea').first().fill('Roasted pumpkin, brown butter, crispy sage and smoked scamorza on our 72-hour dough.');
     await page.getByRole('button', { name: /Add .*Takeaway/ }).click();
     await page.getByLabel('Takeaway').locator('input').last().fill('Available Wednesday to Sunday until the end of November.');
-    const editor = page.locator('[contenteditable="true"]').first();
-    await editor.click();
-    await page.waitForTimeout(300);
-    await page.keyboard.type('## Why pumpkin?');
-    await page.keyboard.press('Enter');
-    await page.keyboard.type('Autumn squash roasts beautifully in a 900°F hearth, turning sweet and smoky in under two minutes.');
-    await page.keyboard.press('Enter');
-    await page.keyboard.type('> Brown butter and sage were made for each other.');
-    await page.keyboard.press('Enter');
-    await page.keyboard.press('Enter');
-    await page.keyboard.type('Ask for it by name at the counter.');
+    // Write the body in the editor's raw Markdown mode ("Edit in Markdown" toolbar button) with a
+    // single fill(): simulated keystrokes in the rich-text editor race against its own "## "
+    // heading conversion on slower machines and can drop characters, which made this scenario
+    // flaky. Rich-text mode is still covered by scenario 4 (validation) and by the screenshot.
+    const BODY = [
+      '## Why pumpkin?',
+      '',
+      'Autumn squash roasts beautifully in a 900°F hearth, turning sweet and smoky in under two minutes.',
+      '',
+      '> Brown butter and sage were made for each other.',
+      '',
+      'Ask for it by name at the counter.',
+    ].join('\n');
+    const rawToggle = page.getByRole('button', { name: 'Edit in Markdown' }); // the only Markdown field on the form
+    await rawToggle.click();
+    const raw = page.getByLabel('Essay', { exact: true }).and(page.locator('textarea'));
+    await raw.waitFor();
+    await raw.fill(BODY);
+    await rawToggle.click(); // back to rich text so the screenshot shows the WYSIWYG editor
     await page.waitForTimeout(400);
     await shot(page, '12-blog-editor');
 
