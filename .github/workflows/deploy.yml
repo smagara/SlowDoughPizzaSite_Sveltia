@@ -1,0 +1,66 @@
+# Build & deploy the website to GitHub Pages.
+#
+# Trigger: every push to `main` — i.e. whenever a content pull request created by Sveltia CMS
+# (branch cms/<collection>/<slug>) is approved and merged, or a developer merges code.
+#
+# Repository settings required once:
+#   Settings → Pages → "Build and deployment" → Source: **GitHub Actions**
+#   (optional) Settings → Variables → CMS_OAUTH_BASE_URL = https://<your-worker>.workers.dev
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never run two deployments at once; let the latest one win.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: Validate & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Validate CMS content (same rules as the editor)
+        run: npm run validate:content
+
+      - name: Type-check (includes the CMS configuration)
+        run: npm run lint
+
+      - name: Build site + content editor
+        run: npm run build
+        env:
+          # Project site → served from https://<owner>.github.io/<repo>/
+          BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_CMS_OAUTH_BASE_URL: ${{ vars.CMS_OAUTH_BASE_URL }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,52 @@
+# Pull request checks — runs for every PR targeting `main`, including the ones Sveltia CMS opens
+# automatically from the content editor (branches cms/<collection>/<slug>).
+#
+# Make this a *required* status check in the `main` branch protection rule so that content that
+# fails validation can never be merged:
+#   Settings → Branches → main → "Require status checks to pass" → "Validate & build (PR)"
+name: PR check
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Validate & build (PR)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # merge commit + its parents, for the file summary below
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Validate CMS content
+        run: npm run validate:content
+
+      - name: Type-check
+        run: npm run lint
+
+      - name: Build (dry run, nothing is deployed)
+        run: npm run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Content check"
+            echo ""
+            echo "Files changed in this pull request:"
+            echo ""
+            git diff --name-only HEAD^1 HEAD 2>/dev/null | sed 's/^/- `/; s/$/`/' || true
+          } >> "$GITHUB_STEP_SUMMARY"
