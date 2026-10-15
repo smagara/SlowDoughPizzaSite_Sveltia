@@ -146,3 +146,6 @@ coverage/
 .DS_Store
 
 build.txt
+# Local scratch files for the e2e harness & test output
+tests/e2e/.scratch/
+test-results/

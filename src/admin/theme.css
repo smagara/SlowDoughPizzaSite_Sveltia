@@ -1,0 +1,75 @@
+/*
+ * Site-themed skin for the Sveltia CMS editor.
+ * Sveltia's UI is driven by CSS custom properties (--sui-*). We only override the tokens
+ * needed to match the public site: warm cream backgrounds, terracotta accent (#c85a32),
+ * Georgia headings and the system sans-serif body stack.
+ *
+ * Sveltia injects its own rules (e.g. `:root[data-theme="light"]`, specificity 0,2,0) *after*
+ * this stylesheet, so the selectors below are tripled (:root:root:root → 0,3,0) to win on
+ * specificity without resorting to !important. A user's "more contrast" preference
+ * (`[data-contrast="more"]`) intentionally still overrides the accent colour.
+ */
+
+:root:root:root {
+  /* Warm hue (#c85a32 ≈ hsl(16 60% 49%)) tints Sveltia's neutral greys slightly warm. */
+  --sui-base-hue: 24;
+  --sui-font-family-default: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sui-control-font-family: var(--sui-font-family-default);
+  --sui-primary-accent-color: #c85a32;
+  --sui-primary-accent-color-light: #d56a43;
+  --sui-primary-accent-color-dark: #a84d2a;
+  --sui-primary-accent-color-text: #8c3d1e;
+  --sui-primary-accent-color-translucent: hsl(16 60% 50% / 60%);
+  --sui-primary-accent-color-translucent-light: hsl(16 60% 50% / 40%);
+  --sui-focus-ring-color: #c85a32;
+}
+
+/* Cream page backgrounds like the public site (light theme only) */
+:root:root:root[data-theme="light"] {
+  --sui-background-color-1-hsl: 36 33% 98%;   /* #faf8f5 */
+  --sui-background-color-2-hsl: 36 33% 97%;
+  --sui-background-color-3-hsl: 34 30% 94%;   /* #f5ede3 */
+  --sui-background-color-4-hsl: 34 28% 91%;
+  --sui-background-color-5-hsl: 33 25% 84%;
+  --sui-border-color-3-hsl: 32 25% 84%;        /* #e6ddd2 */
+  --sui-primary-accent-color-text: #8c3d1e;
+}
+
+/* Dark theme keeps Sveltia's contrast but with a lighter terracotta for legibility */
+:root:root:root[data-theme="dark"] {
+  --sui-primary-accent-color: #e07a52;
+  --sui-primary-accent-color-light: #e98b66;
+  --sui-primary-accent-color-dark: #c85a32;
+  --sui-primary-accent-color-text: #f0a27f;
+}
+
+/* Serif headings (app title, entry titles, collection names) */
+:root:root h1,
+:root:root h2,
+:root:root h3 {
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: -0.01em;
+}
+
+/* Splash shown before the CMS mounts */
+#sd-splash {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: #faf8f5;
+  color: #24211e;
+  font-family: Georgia, "Times New Roman", serif;
+  z-index: 1;
+}
+#sd-splash .sd-splash-brand { font-size: 2rem; font-weight: 700; }
+#sd-splash .sd-splash-sub {
+  font-family: system-ui, sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #7d7165;
+}

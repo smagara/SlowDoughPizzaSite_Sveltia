@@ -1,5 +1,5 @@
 import React from 'react';
-import { STORE_HOURS } from '../data/pizzaShopData';
+import { STORE_HOURS } from '../content';
 import { Clock, MapPin, Phone, Mail, Sparkles, AlertCircle } from 'lucide-react';
 
 export const HoursAndLocation: React.FC = () => {

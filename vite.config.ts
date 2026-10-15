@@ -2,13 +2,28 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
+import markdownContent from './tools/vite-plugin-markdown-content';
+import contentSecurityPolicy from './tools/vite-plugin-csp';
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    // GitHub Pages serves the site from https://smagara.github.io/SlowDoughPizzaSite_Sveltia/
+    // The deploy workflow sets BASE_PATH accordingly; local dev/preview serve from "/".
+    base: process.env.BASE_PATH ?? '/',
+    plugins: [react(), tailwindcss(), markdownContent(), contentSecurityPolicy()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+      },
+    },
+    build: {
+      rollupOptions: {
+        input: {
+          // Public site
+          main: path.resolve(__dirname, 'index.html'),
+          // Sveltia CMS editor (hidden link in the footer → /admin/)
+          admin: path.resolve(__dirname, 'admin/index.html'),
+        },
       },
     },
     server: {

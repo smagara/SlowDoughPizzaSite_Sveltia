@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MENU_CATEGORIES } from '../data/pizzaShopData';
+import { MENU, MENU_CATEGORIES } from '../content';
 import { Leaf, Info } from 'lucide-react';
 
 export const MenuSection: React.FC = () => {
@@ -21,8 +21,7 @@ export const MenuSection: React.FC = () => {
             Our Daily Menu
           </h2>
           <p className="mt-3 text-sm sm:text-base text-[#615448]">
-            Every pizza is an authentic 12-inch Neapolitan pie crafted from 72-hour slow-fermented dough, 
-            stretched gently by hand to preserve the airy cornicione, and flash-baked in our 900°F wood-fired hearth.
+            {MENU.intro}
           </p>
         </div>
 

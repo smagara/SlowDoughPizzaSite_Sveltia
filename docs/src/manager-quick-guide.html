@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Slow Dough Pizza Co. — Updating the website: Manager Quick Guide</title>
+<style>
+  @page { size: A4; margin: 12mm 13mm 12mm 13mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #24211e; font-size: 8.8pt; line-height: 1.3; background: #fff; }
+  h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; margin: 0; color: #24211e; }
+  .masthead { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #c85a32; padding-bottom: 3mm; margin-bottom: 3.5mm; }
+  .masthead h1 { font-size: 18pt; letter-spacing: -0.01em; white-space: nowrap; }
+  .masthead .sub { color: #7d7165; font-size: 9pt; text-transform: uppercase; letter-spacing: 0.16em; margin-top: 1mm; }
+  .masthead .url { font-size: 8.6pt; color: #8c3d1e; text-align: right; line-height: 1.5; }
+  .url code { font-family: Consolas, Menlo, monospace; font-size: 8.4pt; }
+  .intro { background: #f5ede3; border: 1px solid #e2d6c7; border-radius: 8px; padding: 2.2mm 4mm; margin-bottom: 3.5mm; display: flex; gap: 6mm; }
+  .intro .what { flex: 1; }
+  .intro .what b { color: #8c3d1e; }
+  .intro ul { margin: 1mm 0 0 4mm; padding: 0; }
+  .intro li { margin: 0.6mm 0; }
+  .steps { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm 5mm; align-items: start; }
+  .col { display: flex; flex-direction: column; gap: 3mm; }
+  .step { border: 1px solid #e6ddd2; border-radius: 8px; padding: 2.4mm 3.2mm; background: #fffdfa; }
+  .step h2 { font-size: 11.5pt; display: flex; align-items: center; gap: 2.5mm; margin-bottom: 1.5mm; }
+  .num { display: inline-flex; align-items: center; justify-content: center; width: 6.5mm; height: 6.5mm; border-radius: 50%; background: #c85a32; color: #fff; font: bold 9.5pt system-ui, sans-serif; flex: none; }
+  .step p { margin: 0 0 1.5mm 0; }
+  .step img { width: 100%; display: block; border: 1px solid #ded3c5; border-radius: 5px; margin-top: 1.5mm; }
+  .step .two { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5mm; align-items: start; }
+  .tip { background: #f0e7dc; border-left: 3px solid #c85a32; padding: 1.5mm 2.5mm; border-radius: 0 5px 5px 0; margin-top: 1.5mm; font-size: 8.9pt; }
+  .warn { background: #fbeee8; border-left: 3px solid #a84d2a; padding: 1.5mm 2.5mm; border-radius: 0 5px 5px 0; margin-top: 1.5mm; font-size: 8.9pt; }
+  .wide { grid-column: 1 / -1; }
+  .pagebreak { break-before: page; }
+  h2.section { font-size: 13pt; color: #8c3d1e; margin: 0 0 2.5mm 0; padding-bottom: 1.2mm; border-bottom: 1px solid #e6ddd2; }
+  table { border-collapse: collapse; width: 100%; font-size: 8.5pt; }
+  th, td { border: 1px solid #e2d6c7; padding: 1.1mm 2mm; vertical-align: top; text-align: left; }
+  th { background: #f0e7dc; font-weight: 600; }
+  .footer { margin-top: 1.5mm; padding-top: 1.2mm; border-top: 1px solid #e6ddd2; font-size: 8.2pt; color: #7d7165; display: flex; justify-content: space-between; gap: 8mm; }
+  kbd { font-family: Consolas, Menlo, monospace; font-size: 8.6pt; background: #f5ede3; border: 1px solid #ded3c5; border-radius: 3px; padding: 0 1mm; }
+  .pill { display: inline-block; background: #fff3d6; border: 1px solid #e3c27a; color: #6b4e00; border-radius: 10px; padding: 0 2mm; font-size: 8.4pt; }
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div>
+    <h1>Updating the Slow Dough website</h1>
+    <div class="sub">Manager quick guide · Daily Menu · Blog · Dough announcement · Opening hours</div>
+  </div>
+  <div class="url">
+    Editor: <code>smagara.github.io/SlowDoughPizzaSite_Sveltia/admin/</code><br>
+    Sign-in: your GitHub account (you must be a collaborator)<br>
+    Works best in Chrome or Edge on a laptop
+  </div>
+</div>
+
+<div class="intro">
+  <div class="what">
+    <b>What you can change yourself</b>
+    <ul>
+      <li><b>Daily Menu</b> — sections, items, descriptions, prices, dietary badges</li>
+      <li><b>Blog Posts</b> — write, edit or hide essays in “The Baker’s Journal”</li>
+      <li><b>Dough Announcement</b> — the dark strip at the top of every page</li>
+      <li><b>Opening Hours</b> — times and notes for each day</li>
+    </ul>
+  </div>
+  <div class="what">
+    <b>How publishing works</b>
+    <ul>
+      <li>You edit and click <b>Save</b>, then <b>Send for Review</b>.</li>
+      <li>Your change is packaged as a <i>pull request</i> on GitHub — the live site is <b>not</b> changed yet.</li>
+      <li>A reviewer approves it; the website updates itself about 2–3 minutes later.</li>
+      <li>Nothing you do in the editor can break the live site — every change is checked and reviewed first.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="steps">
+ <div class="col">
+  <div class="step">
+    <h2><span class="num">1</span> Open the editor and sign in</h2>
+    <p>Scroll to the very bottom of the website and click the small pen icon <b>✎</b> next to “All dough aged with patience.” (it is faint until you hover over it), or type the editor address above.</p>
+    <img src="../images/guide/footer-link.png" alt="The hidden pen icon in the website footer">
+    <p style="margin-top:2mm">Click <b>Sign In with GitHub</b> and approve the request in the GitHub window. (If the site owner gave you an <i>access token</i> instead, use “Sign In Using Access Token” and paste it once — your browser remembers it.)</p>
+    <img src="../images/guide/login.png" alt="Sign-in page" style="width:46%; margin:1.5mm auto 0;">
+  </div>
+  <div class="step">
+    <h2><span class="num">3</span> Make your change</h2>
+    <p>Menu sections and items are folded up — click <b>Expand All</b> or the small arrow on a row. Change the text or price, drag the <b>=</b> handle to reorder, use <b>+ Add Item</b> / <b>×</b> to add or remove. The right-hand pane previews your text.</p>
+    <img src="../images/guide/menu-edit.png" alt="Menu editor with a price being edited" style="width:44%; margin-left:auto; margin-right:auto;">
+    <div class="tip">Green counters such as <b>24 / 80</b> show how much room is left in a field. Badges (Vegetarian, Spicy…) are chosen from a list.</div>
+  </div>
+ </div>
+ <div class="col">
+  <div class="step">
+    <h2><span class="num">2</span> Pick what you want to change</h2>
+    <p>On the left, choose <b>Blog Posts</b> or <b>Site Content</b>. Site Content holds the <b>Daily Menu</b>, <b>Dough Announcement</b> and <b>Opening Hours</b> — click one to open it.</p>
+    <img src="../images/guide/site-content.png" alt="Site Content list">
+  </div>
+
+  <div class="step">
+    <h2><span class="num">4</span> Save, then Send for Review</h2>
+    <p>Click <b>Save</b> (top right). The editor confirms that your change was saved as a draft and asks whether to send it for review — click <b>Send for Review</b>.</p>
+    <img src="../images/guide/send-for-review.png" alt="Send for Review dialog">
+    <p style="margin-top:2mm">The item now shows <span class="pill">In Review</span>. Choose <b>Later</b> only if you want to keep editing before anyone looks at it; the change then waits as a <span class="pill">Draft</span> until you send it.</p>
+    <img src="../images/guide/in-review.png" alt="Daily Menu marked In Review">
+  </div>
+
+  <div class="step">
+    <h2><span class="num">5</span> Wait for approval — then it’s live</h2>
+    <p>The reviewer (site owner / developer) gets your change as a GitHub pull request, reads exactly what changed, and approves it. The website rebuilds itself and your update appears a few minutes later — no further action needed from you.</p>
+    <p>Follow progress on the <b>Editorial Workflow</b> board (branch icon at the top of the editor): <b>Drafts → In Review</b>. Once approved and merged, the card disappears and the change is on the site.</p>
+    <img src="../images/guide/workflow-board.png" alt="Editorial workflow board" style="width:70%; margin-left:auto; margin-right:auto;">
+  </div>
+ </div>
+</div>
+
+<!-- ===================================================== PAGE 2 -->
+<div class="pagebreak"></div>
+
+<div class="col">
+  <div class="step wide">
+    <h2 class="section">Writing a blog post</h2>
+    <div class="two" style="grid-template-columns: 1.3fr 1fr">
+      <div>
+        <p>Open <b>Blog Posts</b> → <b>New</b>. Fill in the <b>Title</b>, a one-line <b>Subtitle</b>, <b>Author</b>, the <b>Publish date</b> (posts are listed newest first), choose an <b>Illustration</b> and write a short <b>Excerpt</b> for the card. Add up to five <b>Key takeaways</b> — they appear as “Essential Insights”.</p>
+        <p>Write the <b>Essay</b> in the large box. Use the toolbar (or type at the start of a line): <b>Heading 2</b> (<kbd>## </kbd>) for section titles, <b>Quote</b> (<kbd>&gt; </kbd>) for a pull-quote, <b>Bold</b>/<b>Italic</b>, bullet lists and links. Plain text only — the site applies the fonts and colours.</p>
+        <p><b>Show on website</b> hides a post without deleting it (e.g. a seasonal post). Editing an existing post works the same way: open it from the list, change, Save, Send for Review.</p>
+        <div class="tip">The file name (“slug”) is made from the title when you first save — keep titles short and descriptive. Duplicate a post from the ⋮ menu to reuse its structure.</div>
+      </div>
+      <img src="../images/guide/blog-edit.png" alt="Blog post editor" style="margin-top:0; width:88%; justify-self:center;">
+    </div>
+  </div>
+
+  <div class="step wide">
+    <h2 class="section">Rules the editor enforces</h2>
+    <div class="two" style="grid-template-columns: 1.1fr 1fr">
+      <div>
+        <p>The form checks your text when you click Save. If something is wrong, the field is outlined in red with a message and a banner says how many fields need attention — the change is <b>not</b> saved until they are fixed.</p>
+        <ul style="margin:1mm 0 0 4mm; padding:0;">
+          <li>Required fields (marked <b>*</b>) cannot be empty.</li>
+          <li>Every text field has a maximum length (see the counter).</li>
+          <li>The characters <b>&lt;</b> and <b>&gt;</b> and anything that looks like web code (such as <b>&lt;script&gt;</b> or <b>&lt;div&gt;</b>) are not allowed — paste plain text only. Copying from Word or a web page can bring hidden code along; if you see this error, retype the sentence.</li>
+          <li>Prices are numbers between 0 and 500 (use 12.5 for $12.50). The Opening Hours always list seven days — change the times and notes, not the days.</li>
+        </ul>
+      </div>
+      <img src="../images/guide/validation-field.png" alt="Validation errors" style="margin-top:0; width:84%; justify-self:center;">
+    </div>
+  </div>
+
+  <div class="step wide">
+    <h2 class="section">If something looks wrong</h2>
+    <table>
+      <tr><th style="width:34%">What you see</th><th>What to do</th></tr>
+      <tr><td>My change is not on the website yet.</td><td>It has probably not been approved yet — check the Editorial Workflow board. After approval, allow 2–3 minutes and refresh the page (Ctrl/⌘ + Shift + R).</td></tr>
+      <tr><td>“You don’t have access to the repository.”</td><td>Your GitHub account is not a collaborator on the website repository. Ask the site owner to add you (Settings → Collaborators) and sign in again.</td></tr>
+      <tr><td>“N fields have errors.”</td><td>Click <b>Show Errors</b>, fix the outlined fields (see the rules above) and Save again.</td></tr>
+      <tr><td>The editor shows old text, or says “the branch has moved”.</td><td>Reload the editor page — it fetches the latest content from GitHub. If someone else changed the same item, re-open it and redo your edit.</td></tr>
+      <tr><td>I want to change or undo something.</td><td>Still “In Review”: open the item again, edit and Save — the same request is updated; or discard it with the ↶ button on its card on the board. Already live: make the opposite change, or ask the reviewer to revert it on GitHub.</td></tr>
+
+    </table>
+  </div>
+</div>
+
+<div class="footer">
+  <span><b>Good to know:</b> sign out (account menu, top right) on a shared computer; never paste your access token into a message or document.</span>
+  <span style="white-space:nowrap">Manager quick guide v1.0 · Questions? Contact the site developer / owner.</span>
+</div>
+
+</body>
+</html>

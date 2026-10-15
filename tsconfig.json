@@ -23,5 +23,7 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "include": ["src", "tools", "scripts", "tests", "vite.config.ts"],
+  "exclude": ["node_modules", "dist", "tests/e2e/.scratch"]
 }
