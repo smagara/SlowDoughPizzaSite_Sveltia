@@ -162,6 +162,15 @@
             "Seasonal",
             "Gluten-Free"
           ]
+        },
+        {
+          "name": "Canadian Club",
+          "italianName": "Canadese Club",
+          "description": "Sweet whisky for cocktails",
+          "price": 8.45,
+          "tags": [
+            "Gluten-Free"
+          ]
         }
       ]
     }
