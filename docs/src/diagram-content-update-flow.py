@@ -92,7 +92,7 @@ def arrow(a, b, label=None, dashed=False, color=LINE):
 X = left + label_w + 50; G = 48; BW = 300
 xs = [X + i * (BW + G) for i in range(6)]
 # lane 0 (manager)
-box("open", 0, xs[0], "Open hidden ✎ link\n(footer) → /admin/\nSign in with GitHub", num=1)
+box("open", 0, xs[0], "Open the editor URL\n(bookmark, not linked\nfrom the site) · sign in", num=1)
 box("edit", 0, xs[1], "Edit Daily Menu,\nBlog post, Announce-\nment or Opening Hours", num=3)
 box("val", 0, xs[2], "Form validation\nrequired · max length\nno < > or HTML tags", fill=REDBG, outline=TERRA, num=4)
 box("save", 0, xs[3], "Save\n(changes stay on a\nseparate branch)", num=5)

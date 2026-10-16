@@ -104,8 +104,8 @@ doc.add_paragraph()
 TABLE(["Item", "Value"], [
     ["Repository", "https://github.com/smagara/SlowDoughPizzaSite_Sveltia"],
     ["Live site", "https://smagara.github.io/SlowDoughPizzaSite_Sveltia/"],
-    ["Content editor", "https://smagara.github.io/SlowDoughPizzaSite_Sveltia/admin/ (hidden ✎ link in the site footer)"],
-    ["Document version", "1.1 — " + datetime.date.today().strftime("%d %B %Y") + " (1.0: initial design; 1.1: default-branch detection after the “empty editor” finding, build diagnostics, e2e hardening — see §16)"],
+    ["Content editor", "https://smagara.github.io/SlowDoughPizzaSite_Sveltia/admin/ — unlisted URL, not linked from the site (v1.2)"],
+    ["Document version", "1.2 — " + datetime.date.today().strftime("%d %B %Y") + " (see §16 Revision history)"],
     ["Status", "Prototype — implemented and verified offline with an end-to-end test; production sign-in (OAuth helper) and branch protection require one-time owner setup (§12)"],
     ["Audience", "Site owner, developers maintaining the site, reviewers of content pull requests"],
     ["Companion document", "Manager Quick Guide (docs/Manager-Quick-Guide.pdf) — 2-page instructions for the pizza manager"],
@@ -143,7 +143,7 @@ TABLE(["#", "Requirement (from the brief)", "Design element", "Verified by"], [
     ["R1", "Integrate Sveltia CMS so the owner can self-service the Daily Menu, Blog posts and Dough announcement", "§4 content model (content/*.json, content/blog/*.md); §5 editor collections `site` and `blog`", "e2e scenarios 3, 5, 6; screenshots B-3…B-9"],
     ["R2", "Local edit mode for dev testing", "§10 — Sveltia's “Work with Local Repository” on localhost (File System Access API), no proxy server", "e2e scenario 7 (fake file system)"],
     ["R3", "Production integration with GitHub, running on GitHub Pages from the named repository", "§6, §8 — GitHub backend `smagara/SlowDoughPizzaSite_Sveltia`, Pages deployment with base path", "e2e scenario 8 (production build served at the Pages URL)"],
-    ["R4", "Hidden link to a web form of the editable fields, styled appropriately for the site", "§5.4 — unobtrusive ✎ link in the footer → /admin/; site-themed skin (cream/terracotta/Georgia)", "e2e scenarios 1, 8; screenshots B-1, B-2"],
+    ["R4", "Hidden link to a web form of the editable fields, styled appropriately for the site", "§5.4 — v1.0 used an unobtrusive ✎ footer link; per the owner's v1.2 request the site now contains no link at all and editors use the unlisted /admin/ URL. Editor skinned in the site palette; preview pane renders the real page sections (§5.5)", "e2e scenarios 1, 3, 6, 8 (no link/reference to /admin in the public page; preview templates rendered); screenshots B-1, B-5…B-12"],
     ["R5", "Only GitHub repository collaborators may access", "§6 — Sveltia checks `/repos/{owner}/{repo}/collaborators/{user}`; GitHub enforces write permission on every API call", "e2e scenario 2 (non-collaborator rejected)"],
     ["R6", "Reasonable validation of free text, incl. script characters", "§9 — five layers: form rules (regex/length/options), PR review, CI validator, safe rendering, CSP", "e2e scenario 4; `npm run validate:content` negative test"],
     ["R7", "A successful update triggers a pull request on a feature branch (not main) for review/approval", "§7 — Editorial Workflow: branch `cms/<collection>/<slug>`, draft PR, “Send for Review”; editors cannot publish (`publish: false`)", "e2e scenarios 3, 5, 6 (branch, commit, PR, labels asserted)"],
@@ -204,10 +204,15 @@ TABLE(["Collection / file", "Key fields and rules"], [
     ["Site Content → Opening Hours", "days: exactly 7 rows; day is read-only; hours (≤40), statusNote (≤80), isClosed (boolean). Adding/removing/reordering days is disabled."],
 ], widths=[4.5, 12])
 P("Every free-text field carries a `pattern` rule (§9.1) and a `maxlength`; list fields have `min`/`max`; selects use fixed option lists so a value can only be one of the known badges or illustrations.")
-H("5.4 Hidden entry point and site styling", 2)
-P("The footer's copyright line contains a small pen icon (✎) rendered at 25 % opacity that becomes fully visible on hover or keyboard focus and links to /admin/ (Footer.tsx, id `staff-editor-link`). It is deliberately unobtrusive rather than invisible: it stays keyboard- and screen-reader-accessible, and obscurity is not the security boundary — the editor itself requires GitHub sign-in and collaborator status (§6). The link respects the Pages base path via import.meta.env.BASE_URL.")
-P("The editor is skinned to match the site (src/admin/theme.css): Sveltia's UI is driven by CSS custom properties, so the accent colour is set to the site's terracotta (#c85a32), backgrounds to the site's cream palette, headings to Georgia and body text to the system sans-serif stack. The login page shows the site name and a custom logo (public/admin/logo.svg). A preview stylesheet (src/admin/preview.css) gives the live preview pane the site's typography. The public site's layout is not used as the editing form on purpose: Sveltia's form is the accessible, validated, field-by-field UI that non-technical users need, and it is branded rather than replaced.")
-FIG(f"{IMG}/cms/05-menu-editor.png", "Figure 2 — The Daily Menu editor with the site theme applied (left: fields, right: live preview).", 15.5)
+H("5.4 Entry point: an unlisted URL, no link on the site", 2)
+P("Version 1.0 placed a faint ✎ icon in the footer (visible on hover/focus) that linked to /admin/. After review the owner asked for the editor to stay secret from visitors and bots, so since v1.2 the public site contains no link and no reference to the editor at all — the end-to-end test asserts that neither the rendered page nor dist/index.html mentions “admin”. Editors reach the editor through the address https://smagara.github.io/SlowDoughPizzaSite_Sveltia/admin/, which they bookmark; the manager guide gives the address on its first page.")
+P("What this does and does not achieve: the page is not discoverable (no inbound link; <meta name=\"robots\" content=\"noindex, nofollow\">; no sitemap entry), but it is still a public URL. Anyone who guesses it sees only the sign-in page; every action behind it requires GitHub sign-in and repository collaborator access (§6). Deliberately no robots.txt Disallow line is added, because that file is public and would advertise the path. Obscurity lowers noise; GitHub provides the security.")
+H("5.5 Site styling and the live preview", 2)
+P("The editor is skinned to match the site (src/admin/theme.css): Sveltia's UI is driven by CSS custom properties, so the accent colour is set to the site's terracotta (#c85a32), backgrounds to the site's cream palette, headings to Georgia and body text to the system sans-serif stack. The login page shows the site name and a custom logo (public/admin/logo.svg; since v1.2 a light tile with a terracotta ring so it renders correctly on the dark theme as well).")
+P("The preview pane renders the section being edited as it will look on the website (src/admin/preview/). Four React templates are registered with CMS.registerPreviewTemplate — keyed by file name for the Site Content files (menu, announcement, hours) and by collection name for blog — together with a stylesheet injected into the preview iframe that reproduces the site's palette and typography (Tailwind is not available there). They mirror the public components: the Daily Menu with its section pills, item cards, prices and dietary badges; the dark announcement strip above the real header and hero, or a note when the banner is switched off; the Weekly Schedule table with closed days; and the blog post card (meta line, title, subtitle, excerpt, Essential Insights) followed by the full essay, whose Markdown body is rendered by Sveltia's own sanitised preview widget inside the site's article styling. A thin browser-like frame labels each preview “as it will appear on slowdoughpizza.com”. The templates are pure, hook-free function components, so the JSX produced by this project's React runtime can be rendered by the React instance bundled inside Sveltia (same major version); they update live as fields change and show placeholders for empty fields. The preview always uses the light site palette, independent of the editor theme, because it depicts the website rather than the editor.")
+H("5.6 No media uploads", 2)
+P("The site has no image fields (all artwork is inline SVG), so an Assets area would only invite stray uploads. Sveltia insists on a media_folder in its configuration validation, therefore two measures are combined: the asset entry points — the Assets navigation item, the “Show Assets” toolbar button and the “Assets” item of the global “+” menu — are removed from the UI by theme.css, and the default media library is configured with max_file_size: 0 so that any upload, including one attempted through the direct #/assets route, is rejected before anything is committed. The end-to-end test covers both. If photos are wanted later (§14), revert these two settings and add an Image field.")
+FIG(f"{IMG}/cms/05-menu-editor.png", "Figure 2 — The Daily Menu editor: fields on the left, the site-styled live preview on the right.", 15.5)
 
 # ================================================================== 6
 H("6. Authentication and authorisation")
@@ -226,7 +231,7 @@ H("7. Editorial workflow: from Save to pull request")
 P("Sveltia's Editorial Workflow (`publish_mode: editorial_workflow`) is enabled globally. Figure 3 (next page) shows the full path of a change from the manager's browser to the live site; the numbered steps are described in the table below.")
 landscape_figure(f"{IMG}/diagrams/content-update-flow.png", "Figure 3 — Content update flow across the manager, GitHub, GitHub Actions and the reviewer (numbered steps are described in the table that follows).")
 TABLE(["Step", "What happens", "Where"], [
-    ["1–2", "Manager opens the hidden link, signs in; Sveltia verifies collaborator status.", "Browser → GitHub API"],
+    ["1–2", "Manager opens the bookmarked editor URL and signs in; Sveltia verifies collaborator status.", "Browser → GitHub API"],
     ["3–4", "Manager edits fields; the form validates required fields, lengths, option lists and the anti-markup regex rules. Save is blocked until errors are fixed.", "Browser"],
     ["5–6", "On Save, Sveltia creates (or reuses) branch cms/<collection>/<slug> from the head of main, commits the changed file(s) with the message `content: update <collection> “<slug>”` via the GraphQL createCommitOnBranch mutation, and opens a DRAFT pull request against main labelled sveltia-cms/draft. main is never written to.", "GitHub"],
     ["7–8", "Because editors cannot publish, Sveltia immediately asks “Send for Review”. Confirming replaces the label with sveltia-cms/pending_review and marks the pull request ready for review (no longer a draft). “Later” keeps it as a draft the manager can keep editing.", "Browser → GitHub"],
@@ -256,7 +261,7 @@ TABLE(["Workflow", "Trigger", "Steps", "Purpose"], [
     [".github/workflows/deploy.yml — “Deploy to GitHub Pages”", "push → main, manual dispatch", "same validate/lint/build · upload-pages-artifact · deploy-pages (environment github-pages)", "Publishes the site after a merge. concurrency group `pages` cancels superseded runs; permissions limited to pages:write + id-token:write."],
 ], widths=[4.2, 2.6, 5.7, 4], font=8.5)
 H("8.1 Base path", 2)
-P("A GitHub project site is served from https://smagara.github.io/SlowDoughPizzaSite_Sveltia/. Vite's `base` is therefore taken from the BASE_PATH environment variable (set to `/${repository name}/` by the workflows; `/` locally). Everything that needs an absolute path — the hidden link, the editor logo, `public_folder`, `logout_redirect_url` — is derived from import.meta.env.BASE_URL so the same source works locally and in production. The build emits two HTML entry points: dist/index.html (public site) and dist/admin/index.html (editor).")
+P("A GitHub project site is served from https://smagara.github.io/SlowDoughPizzaSite_Sveltia/. Vite's `base` is therefore taken from the BASE_PATH environment variable (set to `/${repository name}/` by the workflows; `/` locally). Everything that needs an absolute path — the editor logo, `public_folder`, `logout_redirect_url` — is derived from import.meta.env.BASE_URL so the same source works locally and in production. The build emits two HTML entry points: dist/index.html (public site) and dist/admin/index.html (editor).")
 H("8.2 Build-time inputs", 2)
 B("BASE_PATH — Pages sub-path (workflows only).")
 B("VITE_CMS_OAUTH_BASE_URL — from the repository variable CMS_OAUTH_BASE_URL; optional (§6.1).")
@@ -305,6 +310,7 @@ H("10. Local edit mode for development")
 FIG(f"{IMG}/diagrams/local-dev-mode.png", "Figure 5 — Local edit mode: the editor writes straight into the working copy; no GitHub calls are made.", 16)
 P("When the editor is opened on localhost (e.g. http://localhost:3000/admin/ with `npm run dev`), Sveltia automatically adds a “Work with Local Repository” button. The developer picks the repository folder in the browser's directory picker (File System Access API — Chrome and Edge; Firefox and Safari do not support it) and Sveltia reads and writes content/ files directly. The Vite dev server notices the change and hot-reloads the site, so a developer can test field definitions, validation messages and the resulting page in seconds. Edits are ordinary uncommitted changes reviewed with `git diff` and committed (or discarded) by the developer; there is no branch/PR in this mode and the Editorial Workflow UI is not shown. No configuration switch is needed: the same config.ts serves both modes, which avoids drift between what is tested locally and what runs in production. For the same reason the `local_backend` option known from Decap CMS and its proxy server are not used (Sveltia ignores it).")
 P("The GitHub mode can also be exercised locally: on localhost the login page additionally shows “Sign in with GitHub” / “Sign in using access token” and behaves exactly as in production (branches and pull requests are created in the real repository).")
+P("Two behaviours observed during the first external test are worth knowing. First, Sveltia remembers a successful sign-in (token in local storage; directory handle in IndexedDB) and opens the editor directly on the next visit, so the login page — and the local-repository option on it — is not shown again until the user chooses Sign Out from the account menu. Second, the option is keyed on the hostname: it appears for localhost/127.0.0.1 only, not for the LAN address the dev server also prints.")
 
 # ================================================================== 11
 H("11. Testing strategy")
@@ -312,12 +318,12 @@ P("Because the critical behaviour (branch, commit, pull request, labels, draft s
 TABLE(["#", "Scenario", "Asserts"], [
     ["1", "Editor page loads on localhost", "Title, local + GitHub sign-in buttons, site accent colour applied"],
     ["2", "Non-collaborator signs in", "Access denied message; no content loaded"],
-    ["3", "Edit menu price → Save → Send for Review", "Branch cms/site/menu from main; commit touches only content/menu.json; draft PR → main with label sveltia-cms/draft; after sending: ready for review + sveltia-cms/pending_review; main unchanged; committed JSON well-formed with numeric price; no Publish button"],
+    ["3", "Edit menu price → Save → Send for Review", "Site-styled preview rendered (menu cards); Assets UI hidden; branch cms/site/menu from main; commit touches only content/menu.json; draft PR → main with label sveltia-cms/draft; after sending: ready for review + sveltia-cms/pending_review; main unchanged; committed JSON well-formed with numeric price; no Publish button"],
     ["4", "Script/HTML in title and body", "Both custom error messages shown; save blocked; zero API calls"],
     ["5", "Create a blog post with heading, quote, takeaways", "Branch cms/blog/<slug>; Markdown file parses with the build plugin; front matter fields correct; PR title"],
-    ["6", "Edit the announcement banner", "Branch cms/site/announcement with the new headline"],
+    ["6", "Edit the announcement banner", "Preview strip updates live; branch cms/site/announcement with the new headline; upload on the direct /assets route rejected (0 bytes), nothing committed"],
     ["7", "Local repository mode", "Opening hours written to the working copy; no GitHub request made"],
-    ["8", "Production build served at the GitHub Pages URL", "Base-path-correct hidden link and logo; CSP present with no violations; no local-mode button off localhost; sign-in works"],
+    ["8", "Production build served at the GitHub Pages URL", "No link or reference to /admin in the public page; editor page is noindex; base-path-correct logo; CSP present with no violations; no local-mode button off localhost; sign-in works"],
 ], widths=[0.8, 6, 9.7], font=8.5)
 P("Run with `npm run test:e2e`. npm install brings the Playwright package but not the browser binary; run `npm run test:e2e:setup` (= `npx playwright install chromium`) once — the test prints this hint and exits if Chromium is missing. The test also writes the screenshots used in this document and in the manager guide (docs/images/cms/). Static checks: `npm run lint` type-checks the site, the Vite plugins and the CMS configuration; `npm run validate:content` validates the committed content. Both run in CI.")
 P("Robustness notes from the first external run: scenario 5 originally typed the essay into the rich-text editor with simulated keystrokes. On a slower machine the editor's own “## → heading” conversion raced with the keystrokes (the non-ASCII “°” character is inserted through a different input path) and characters were lost, so the scenario failed intermittently. It now switches the field to raw Markdown mode (“Edit in Markdown” toolbar button) and sets the whole body with a single fill(), then switches back for the screenshot. All waits are on observable state (simulated API calls, file contents) rather than on transient toasts.")
@@ -331,7 +337,7 @@ N("Push this repository to GitHub. In Settings → Pages set Build and deploymen
 N("Add the manager as a collaborator with Write permission (Settings → Collaborators). Remove the collaborator to revoke editor access.")
 N("Protect main (Settings → Branches or Rules): require a pull request before merging, require 1 approval, require the status check “Validate & build (PR)”, block force pushes. Optionally require conversation resolution. Enable Settings → General → Automatically delete head branches.")
 N("Choose the sign-in method. Token mode works immediately. For “Sign in with GitHub”: create a GitHub OAuth App (Homepage URL = site URL; Authorization callback URL = https://<worker>.workers.dev/callback); deploy sveltia/sveltia-cms-auth to Cloudflare Workers with GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET and ALLOWED_DOMAINS=smagara.github.io (add localhost:3000 for local testing); add the repository variable CMS_OAUTH_BASE_URL=https://<worker>.workers.dev; re-run the deploy workflow.")
-N("Post-deployment checks: open the site, hover the footer to find the ✎ link, sign in as the manager, save a harmless change (e.g. the announcement), confirm the pull request appears with the PR check running, approve, merge, and confirm the site updates.")
+N("Post-deployment checks: open the editor URL directly (it is not linked from the site), sign in as the manager, save a harmless change (e.g. the announcement), confirm the pull request appears with the PR check running, approve, merge, and confirm the site updates.")
 H("12.2 Routine operations", 2)
 TABLE(["Task", "How"], [
     ["Review a content change", "Open the pull request → Files changed → Approve → Squash and merge. The site redeploys automatically."],
@@ -341,6 +347,7 @@ TABLE(["Task", "How"], [
     ["Add a new editable field", "Add the field to config.ts, the type in src/types.ts, the loader in src/content/index.ts and the component; the validator picks the rule up automatically."],
     ["Upgrade Sveltia CMS", "`npm update @sveltia/cms`, run `npm run check` and `npm run test:e2e`, deploy."],
     ["Manager lost their token / new manager", "Token mode: create a new fine-grained token (Contents + Pull requests read/write on this repo). OAuth mode: nothing to do beyond collaborator access."],
+    ["“Work with Local Repository” no longer offered (developer machine)", "Still signed in from a previous session (login page skipped) or opened via a non-localhost address. Sign Out from the account menu, or open http://localhost:3000/admin/."],
     ["Editor shows no existing content (Blog Posts 0, empty fields) but can create items", "The branch the editor reads has no content/ folder. Check which branch holds content/ and make it the default branch (must be main for deployment). If the branch is right, clear a stale editor cache: sign out, clear site data for the editor URL, sign in again."],
 ], widths=[4.5, 12], font=9)
 
@@ -352,8 +359,9 @@ TABLE(["ID", "Decision", "Alternatives considered", "Rationale / consequences"],
     ["D3", "Sveltia bundled from npm and booted with a TypeScript config (`load_config_file: false`)", "CDN script + admin/config.yml", "Pinned version, offline builds/tests, type-checked config, base-path-aware paths, rules shared with the validator (see §5.2)"],
     ["D4", "Editorial Workflow with `publish: false` on every collection", "Simple mode (commit straight to main); letting editors publish from the CMS", "Brief requires PR review; editors get a guided “Send for Review” step; merging stays a GitHub action protected by branch rules"],
     ["D5", "OAuth via Sveltia CMS Authenticator on Cloudflare Workers, with token sign-in as fallback and the OAuth button hidden until configured", "Netlify Identity/Git Gateway; self-hosted OAuth server; token only", "Officially supported, free, stateless; no broken button before setup; token mode gives a working prototype on day one"],
-    ["D6", "Hidden but accessible footer link (low-opacity icon, visible on hover/focus)", "Fully invisible link; keyboard shortcut; separate unlisted URL only", "Meets “hidden link” without harming accessibility; security relies on auth, not obscurity"],
-    ["D7", "Brand Sveltia's UI with CSS custom properties and a logo instead of building a custom form", "Custom React form calling the GitHub API; Sveltia custom preview templates", "Reuses Sveltia's validation, rich-text editor, workflow UI and accessibility; minimal code to maintain; matches the site's palette/typography"],
+    ["D6", "v1.0: hidden-but-accessible footer link. v1.2: no link at all — unlisted /admin/ URL, noindex, no robots.txt entry", "Invisible link; keyboard shortcut; robots.txt Disallow", "Owner asked for the editor to be hidden from visitors and bots; an unlisted URL is the cleanest way. Security still relies on GitHub auth, not obscurity"],
+    ["D7", "Brand Sveltia's UI with CSS custom properties and a logo instead of building a custom form; v1.2 adds site-styled preview templates", "Custom React form calling the GitHub API; generic field-dump preview", "Reuses Sveltia's validation, rich-text editor, workflow UI and accessibility; the preview shows staff what they are editing in the website's own look, with Sveltia's sanitised Markdown widget embedded for the essay body"],
+    ["D16", "Remove media uploads: hide asset entry points via CSS and set max_file_size: 0 (v1.2)", "Drop media_folder (rejected by Sveltia's validator); declare an unconfigured cloud library (leaves broken leftovers and a page error on /assets)", "No image fields exist; both measures together remove the UI and make uploads impossible even by URL; trivially reversible when images are wanted"],
     ["D8", "Validation rules expressed once in config.ts and re-applied by a CI script; plus anti-markup regexes on every text field", "Browser-only validation; a separate JSON Schema", "Single source of truth; server-side guarantee that nothing unvalidated reaches main or the build"],
     ["D9", "react-markdown with an element whitelist and `skipHtml` for blog bodies", "Build-time Markdown → HTML + DOMPurify; custom mini-renderer", "No innerHTML anywhere; safe by construction; small runtime cost"],
     ["D10", "Build-only <meta> CSP on the public page", "No CSP (Pages can't set headers)", "Defence in depth at zero cost; excluded from the editor page and dev server where it would break functionality"],
@@ -396,6 +404,7 @@ TABLE(["Risk", "Impact", "Mitigation"], [
 H("16. Revision history")
 TABLE(["Version", "Change", "Trigger"], [
     ["1.0", "Initial design and implementation.", "—"],
+    ["1.2", "Footer link removed — editor reachable only via the unlisted /admin/ URL (§5.4, D6). Media uploads removed (§5.6, D16). Site-styled live preview templates for menu, announcement, hours and blog (§5.5). Logo redrawn for the dark theme. Documented the remembered sign-in / Sign Out behaviour and the localhost-only local option (§10, §12). E2e test extended accordingly.", "Owner feedback after the first production use: keep the editor hidden from the public and bots; no media uploads; preview should look like the website; local option “disappeared” after the first sign-in; a visual defect."],
     ["1.1", "`backend.branch` removed so the editor follows the repository's default branch (D15); runbook step 0 and troubleshooting entry added (§12, §15). Build log reviewed: chunk-size limit raised for the editor bundle, hook filters added to the project's Vite plugins, config-loader notice fixed (§8.3). End-to-end test: raw-Markdown input instead of simulated keystrokes, explicit browser-setup script and hint (§11).", "First external deployment and test run: editor showed no existing data although creating entries and the pull request worked; two build warnings; one flaky scenario; Playwright browser not installed."],
 ], widths=[1.6, 10, 4.9], font=9)
 
@@ -407,8 +416,8 @@ TABLE(["Path", "Role"], [
     ["src/content/index.ts", "Typed content loader (ids, sorting, derived fields)"],
     ["src/types.ts", "Content types (kept in sync with config.ts)"],
     ["src/components/Markdown.tsx", "Safe Markdown renderer for blog bodies"],
-    ["src/components/Navbar.tsx, MenuSection.tsx, ArticlesSection.tsx, HoursAndLocation.tsx, Footer.tsx", "Consume content/; footer hosts the hidden link"],
-    ["admin/index.html, src/admin/main.ts, src/admin/config.ts, src/admin/theme.css, src/admin/preview.css, public/admin/logo.svg", "The editor: entry page, bootstrap, typed configuration, site theme, preview styles, logo"],
+    ["src/components/Navbar.tsx, MenuSection.tsx, ArticlesSection.tsx, HoursAndLocation.tsx", "Consume content/ (the footer no longer links to the editor)"],
+    ["admin/index.html, src/admin/main.ts, src/admin/config.ts, src/admin/theme.css, src/admin/preview/templates.tsx, src/admin/preview/preview.css, public/admin/logo.svg", "The editor: entry page, bootstrap, typed configuration, site theme (incl. hiding the asset UI), site-styled preview templates + stylesheet, logo"],
     ["tools/vite-plugin-markdown-content.ts", "Build-time Markdown + front matter import"],
     ["tools/vite-plugin-csp.ts", "Build-only Content Security Policy meta tag"],
     ["scripts/validate-content.ts", "CI content validator driven by config.ts"],
@@ -423,21 +432,21 @@ H("Appendix B — Editor screenshots")
 P("All screenshots were captured by the end-to-end test against the real editor build; the GitHub API was simulated.", italic=True, size=9)
 shots = [
     ("16-production-login", "B-1 — Sign-in page as deployed on GitHub Pages (site theme, logo, no local-mode button)."),
-    ("15-hidden-footer-link", "B-2 — The hidden ✎ link in the site footer (shown while hovered)."),
-    ("03-collections", "B-3 — Collections after sign-in: Blog Posts and Site Content."),
-    ("04-site-content", "B-4 — Site Content: Daily Menu, Dough Announcement, Opening Hours."),
-    ("06-menu-price-edited", "B-5 — Editing a menu item (price changed)."),
+    ("03-collections", "B-2 — Collections after sign-in: Blog Posts and Site Content (no Assets area)."),
+    ("04-site-content", "B-3 — Site Content: Daily Menu, Dough Announcement, Opening Hours."),
+    ("05-menu-editor", "B-4 — Daily Menu editor with the site-styled preview (menu cards, prices, badges)."),
+    ("06-menu-price-edited", "B-5 — Editing a menu item (price changed; the preview follows)."),
     ("07-send-for-review", "B-6 — After Save: the pull request exists as a draft; the editor offers “Send for Review”."),
     ("08-entry-in-review", "B-7 — The Daily Menu now shows “In Review”; the pull request is ready for review on GitHub."),
     ("09-workflow-board", "B-8 — Editorial Workflow board (no Publish action for editors)."),
     ("10-validation-errors", "B-9 — Script/HTML characters rejected in a title and in the essay body."),
-    ("12-blog-editor", "B-10 — Blog post editor with heading, quote and takeaways."),
-    ("13-announcement-editor", "B-11 — Dough announcement editor."),
+    ("12-blog-editor", "B-10 — Blog post editor; the preview renders the post card and essay in the site's journal style."),
+    ("13-announcement-editor", "B-11 — Dough announcement editor: the preview shows the strip above the real site header."),
     ("02-not-a-collaborator", "B-12 — A GitHub user who is not a collaborator is refused."),
-    ("14-local-mode-hours", "B-13 — Local repository mode editing Opening Hours (day names are read-only)."),
+    ("14-local-mode-hours", "B-13 — Local repository mode editing Opening Hours (day names are read-only); preview shows the Weekly Schedule table."),
 ]
 for name, cap in shots:
-    FIG(f"{IMG}/cms/{name}.png", cap, 15.5 if name != "15-hidden-footer-link" else 16.5)
+    FIG(f"{IMG}/cms/{name}.png", cap, 15.5)
 
 out = f"{ROOT}/docs/Technical-Design-Document.docx"
 doc.save(out); print("saved", out, os.path.getsize(out) // 1024, "KB")

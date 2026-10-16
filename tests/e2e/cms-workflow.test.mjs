@@ -10,8 +10,10 @@
  *   5. Creating a blog post writes a Markdown file with YAML front matter that the site build can
  *      parse and that passes the CI content validator.
  *   6. "Work with Local Repository" mode writes straight to the working copy (no GitHub).
- *   7. The production build works when served from the GitHub Pages URL (base path, CSP, hidden
- *      footer link, no "local repository" option outside localhost).
+ *   7. The production build works when served from the GitHub Pages URL (base path, CSP, no link
+ *      to /admin/ anywhere on the public page, no "local repository" option outside localhost).
+ *   8. The preview pane renders the site-styled templates; the Assets (media upload) UI is hidden
+ *      and uploads are rejected even on the direct /assets route.
  *
  * GitHub's API is simulated in-process (github-mock.mjs) and wired in via Playwright request
  * interception, so no network, tokens or real repository are needed. Screenshots are written to
@@ -192,6 +194,13 @@ try {
     await page.waitForTimeout(800);
     await shot(page, '05-menu-editor');
 
+    // Site-styled preview template (rendered inside the preview iframe)
+    const preview = page.frames().find((f) => f !== page.mainFrame());
+    assert.ok(preview, 'preview iframe present');
+    await preview.locator('.sd-frame').waitFor();
+    assert.match(await preview.locator('.sd-h2').first().innerText(), /Our Daily Menu/);
+    assert.ok((await preview.locator('.sd-card').count()) >= 10, 'menu item cards rendered');
+
     await expandAll(page);
     const price = page.getByLabel('Price (USD)').locator('input').first();
     const before = await price.inputValue();
@@ -234,6 +243,10 @@ try {
     assert.equal(json.categories[0].items[0].price, 21);
     assert.equal(typeof json.categories[0].items[0].price, 'number');
     assert.ok(committed.startsWith('{\n  "intro"'), 'pretty-printed with 2 spaces');
+
+    // No media uploads: Assets navigation + toolbar button + "+" menu item are hidden
+    assert.equal(await page.locator('button[aria-label="Assets"]:visible').count(), 0, 'Assets nav hidden');
+    assert.equal(await page.locator('button[aria-label="Show Assets"]:visible').count(), 0, '"Show Assets" hidden');
 
     // No "Publish" control for editors — merging happens on GitHub
     await page.goto(`${baseUrl}/admin/#/workflow`);
@@ -341,13 +354,26 @@ ${parsed.body}`);
     await page.getByText('Headline', { exact: true }).waitFor();
     const headline = page.getByLabel('Headline').locator('input').first();
     await headline.fill("Today's Dough: 96-Hour Extended Ferment");
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(600);
+    const preview = page.frames().find((f) => f !== page.mainFrame());
+    await preview.locator('.sd-banner').waitFor();
+    assert.match(await preview.locator('.sd-banner').innerText(), /96-Hour Extended Ferment/, 'preview updates live');
     await shot(page, '13-announcement-editor');
     await page.getByRole('button', { name: 'Save' }).click();
     await page.getByRole('button', { name: 'Send for Review' }).click();
     await until(() => mock.pulls[0]?.labels.includes('sveltia-cms/pending_review'), 'announcement PR sent for review');
     const json = JSON.parse(mock.branches.get('cms/site/announcement').files.get('content/announcement.json'));
     assert.equal(json.headline, "Today's Dough: 96-Hour Extended Ferment");
+
+    // Even the direct /assets route cannot upload anything (media library max_file_size: 0)
+    await page.goto(`${baseUrl}/admin/#/assets`);
+    await page.reload({ waitUntil: 'networkidle' }); // hash-only navigation out of an open entry is not a full route change
+    const fileInput = page.locator('input[type=file]').first();
+    await fileInput.waitFor({ state: 'attached' });
+    await fileInput.setInputFiles({ name: 'photo.txt', mimeType: 'text/plain', buffer: Buffer.from('not allowed') });
+    await page.getByText(/maximum size of .?.?0.? bytes/).waitFor(); // Unicode isolates around the number
+    assert.equal(await page.getByRole('button', { name: 'Upload', exact: true }).last().isDisabled(), true, 'Upload button disabled');
+    assert.equal(mock.log.filter((l) => l.kind === 'commit' && l.additions.some((a) => a.startsWith('public/uploads'))).length, 0, 'no upload committed');
     await ctx.close();
   });
 
@@ -389,7 +415,7 @@ ${parsed.body}`);
     await ctx.close();
   });
   // ------------------------------------------------------------------ 8. production build
-  await test('production build served at the GitHub Pages URL: base path, CSP, hidden link, no local mode', async () => {
+  await test('production build served at the GitHub Pages URL: base path, CSP, no link to the editor, no local mode', async () => {
     const PAGES_ORIGIN = 'https://smagara.github.io';
     const BASE = `/${REPO}/`;
     process.env.BASE_PATH = BASE;
@@ -417,13 +443,11 @@ ${parsed.body}`);
     const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
     assert.match(csp ?? '', /script-src 'self'/);
     assert.deepEqual(cspViolations, [], 'no CSP violations on the public site');
-    const link = page.locator('#staff-editor-link');
-    assert.equal(await link.getAttribute('href'), `${BASE}admin/`);
-    await link.scrollIntoViewIfNeeded();
-    await link.hover();
-    await page.waitForTimeout(400);
-    const box = await link.boundingBox();
-    await page.screenshot({ path: join(shotsDir, '15-hidden-footer-link.png'), clip: { x: 0, y: box.y - 60, width: 1280, height: 110 } });
+    // The editor must not be discoverable from the public page: no link, no reference in the HTML
+    assert.equal(await page.locator('a[href*="admin"]').count(), 0, 'no link to the editor');
+    assert.ok(!(await page.content()).includes('/admin'), 'no reference to /admin in the rendered page');
+    assert.ok(!readFileSync(join(root, 'dist/index.html'), 'utf8').includes('admin'), 'no reference to admin in dist/index.html');
+    assert.ok(/noindex/.test(readFileSync(join(root, 'dist/admin/index.html'), 'utf8')), 'editor page is noindex');
 
     // Editor at the production URL
     await page.goto(`${PAGES_ORIGIN}${BASE}admin/`, { waitUntil: 'networkidle' });

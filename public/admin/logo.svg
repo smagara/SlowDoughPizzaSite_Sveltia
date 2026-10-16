@@ -1,10 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="Slow Dough Pizza Co.">
-  <rect width="96" height="96" rx="20" fill="#24211e"/>
-  <circle cx="48" cy="50" r="27" fill="#f5ede3" stroke="#c85a32" stroke-width="4"/>
-  <circle cx="48" cy="50" r="19" fill="#e9b46a" opacity="0.9"/>
-  <circle cx="40" cy="44" r="3.2" fill="#c85a32"/>
-  <circle cx="55" cy="42" r="3.2" fill="#c85a32"/>
-  <circle cx="52" cy="56" r="3.2" fill="#c85a32"/>
-  <circle cx="41" cy="57" r="2.4" fill="#335928"/>
-  <text x="48" y="20" text-anchor="middle" font-family="Georgia, serif" font-size="11" font-weight="700" fill="#f4efe8" letter-spacing="1.5">SLOW DOUGH</text>
+  <!-- Light tile with a terracotta ring so the mark reads on both the light and the dark editor theme -->
+  <rect x="2" y="2" width="92" height="92" rx="20" fill="#f5ede3" stroke="#c85a32" stroke-width="3"/>
+  <circle cx="48" cy="52" r="26" fill="#faf8f5" stroke="#c85a32" stroke-width="4"/>
+  <circle cx="48" cy="52" r="18.5" fill="#e9b46a"/>
+  <circle cx="40" cy="46" r="3.2" fill="#c85a32"/>
+  <circle cx="55" cy="44" r="3.2" fill="#c85a32"/>
+  <circle cx="52" cy="58" r="3.2" fill="#c85a32"/>
+  <circle cx="41" cy="59" r="2.4" fill="#335928"/>
+  <text x="48" y="20" text-anchor="middle" font-family="Georgia, serif" font-size="10.5" font-weight="700" fill="#24211e" letter-spacing="1.4">SLOW DOUGH</text>
 </svg>

@@ -129,6 +129,8 @@ export const config: CmsConfig = {
   media_folder: 'public/uploads',
   public_folder: `${BASE_URL}uploads`,
 
+  media_libraries: { default: { config: { max_file_size: 0 } } },
+
   slug: { encoding: 'ascii', clean_accents: true, lowercase: true, maxlength: 60 },
 
   output: { omit_empty_optional_fields: false, json: { indent_style: 'space', indent_size: 2 } },

@@ -11,7 +11,7 @@ g.attr("edge", color=LINE, fontcolor=INK, fontsize="9", fontname="Helvetica", ar
 
 with g.subgraph(name="cluster_mgr") as c:
     c.attr(label="Pizza manager (browser)", style="rounded,filled", fillcolor=CREAM, color=LINE, fontname="Helvetica-Bold", fontsize="11")
-    c.node("open", "Open hidden ✎ link\n/admin/")
+    c.node("open", "Open the editor URL\n/admin/ (unlisted)")
     c.node("login", "Sign in with GitHub\n(or access token)")
     c.node("edit", "Edit Menu / Blog /\nAnnouncement / Hours")
     c.node("validate", "Form validation\n(required, lengths,\nno < > / HTML)", fillcolor="#fbeee8", color=TERRA)

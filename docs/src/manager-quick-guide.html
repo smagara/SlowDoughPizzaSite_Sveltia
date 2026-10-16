@@ -37,6 +37,7 @@
   th { background: #f0e7dc; font-weight: 600; }
   .footer { margin-top: 1.5mm; padding-top: 1.2mm; border-top: 1px solid #e6ddd2; font-size: 8.2pt; color: #7d7165; display: flex; justify-content: space-between; gap: 8mm; }
   kbd { font-family: Consolas, Menlo, monospace; font-size: 8.6pt; background: #f5ede3; border: 1px solid #ded3c5; border-radius: 3px; padding: 0 1mm; }
+  .addr { font-family: Consolas, Menlo, monospace; font-size: 9.2pt; background: #f5ede3; border: 1px solid #ded3c5; border-radius: 5px; padding: 1.6mm 2.5mm; margin: 1.5mm 0 2mm; color: #8c3d1e; word-break: break-all; }
   .pill { display: inline-block; background: #fff3d6; border: 1px solid #e3c27a; color: #6b4e00; border-radius: 10px; padding: 0 2mm; font-size: 8.4pt; }
 </style>
 </head>
@@ -79,15 +80,15 @@
  <div class="col">
   <div class="step">
     <h2><span class="num">1</span> Open the editor and sign in</h2>
-    <p>Scroll to the very bottom of the website and click the small pen icon <b>✎</b> next to “All dough aged with patience.” (it is faint until you hover over it), or type the editor address above.</p>
-    <img src="../images/guide/footer-link.png" alt="The hidden pen icon in the website footer">
-    <p style="margin-top:2mm">Click <b>Sign In with GitHub</b> and approve the request in the GitHub window. (If the site owner gave you an <i>access token</i> instead, use “Sign In Using Access Token” and paste it once — your browser remembers it.)</p>
+    <p>The editor is <b>not linked from the website</b> (so visitors and search engines never see it). Type the address below once and <b>bookmark it</b>:</p>
+    <p class="addr">https://smagara.github.io/SlowDoughPizzaSite_Sveltia/admin/</p>
+    <p>Click <b>Sign In with GitHub</b> and approve the request in the GitHub window. (If the site owner gave you an <i>access token</i> instead, use “Sign In Using Access Token” and paste it once — your browser remembers it, and next time the editor opens straight away.)</p>
     <img src="../images/guide/login.png" alt="Sign-in page" style="width:46%; margin:1.5mm auto 0;">
   </div>
   <div class="step">
     <h2><span class="num">3</span> Make your change</h2>
-    <p>Menu sections and items are folded up — click <b>Expand All</b> or the small arrow on a row. Change the text or price, drag the <b>=</b> handle to reorder, use <b>+ Add Item</b> / <b>×</b> to add or remove. The right-hand pane previews your text.</p>
-    <img src="../images/guide/menu-edit.png" alt="Menu editor with a price being edited" style="width:44%; margin-left:auto; margin-right:auto;">
+    <p>Menu sections and items are folded up — click <b>Expand All</b> or the small arrow on a row. Change the text or price, drag the <b>=</b> handle to reorder, use <b>+ Add Item</b> / <b>×</b> to add or remove. The right-hand <b>Preview</b> shows that part of the website exactly as it will look, and follows your typing.</p>
+    <img src="../images/guide/menu-edit.png" alt="Menu editor with a price being edited" style="width:100%;">
     <div class="tip">Green counters such as <b>24 / 80</b> show how much room is left in a field. Badges (Vegetarian, Spicy…) are chosen from a list.</div>
   </div>
  </div>
@@ -165,7 +166,7 @@
 
 <div class="footer">
   <span><b>Good to know:</b> sign out (top-right menu) on a shared computer; never share your access token.</span>
-  <span style="white-space:nowrap">Quick guide v1.1 · Questions? Contact the site developer.</span>
+  <span style="white-space:nowrap">Quick guide v1.2 · Questions? Contact the site developer.</span>
 </div>
 
 </body>

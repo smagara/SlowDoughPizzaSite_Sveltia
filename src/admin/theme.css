@@ -73,3 +73,17 @@
   text-transform: uppercase;
   color: #7d7165;
 }
+
+/*
+ * No media uploads. The site has no image fields (all artwork is inline SVG), so the Assets
+ * area would only invite stray uploads. Sveltia requires a `media_folder`, therefore the
+ * asset entry points are removed from the UI here and uploads are additionally rejected by the
+ * `max_file_size: 0` media-library setting in config.ts (belt and braces — see TDD §5.5).
+ * Selectors use the English UI labels (the editor is English-only).
+ */
+button[aria-label="Assets"],
+button[aria-label="Show Assets"],
+[role="menu"][aria-label="Create Entry or Assets"] [role="separator"],
+[role="menu"][aria-label="Create Entry or Assets"] [role="separator"] ~ .menuitem {
+  display: none !important;
+}

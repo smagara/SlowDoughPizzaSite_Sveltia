@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUp, PenLine } from 'lucide-react';
+import { ArrowUp } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   const scrollToTop = () => {
@@ -51,23 +51,8 @@ export const Footer: React.FC = () => {
           <p>
             418 Mill Street • Historic River District • (555) 234-7890
           </p>
-          <p className="flex items-center gap-2">
-            <span>© {new Date().getFullYear()} Slow Dough Pizza Co. All dough aged with patience.</span>
-            {/*
-              Hidden staff link → Sveltia CMS content editor. Visually unobtrusive (same colour as the
-              footer text, revealed on hover/focus) but still keyboard- and screen-reader-accessible.
-              Obscurity is not the security boundary: the editor requires GitHub sign-in and
-              repository collaborator access.
-            */}
-            <a
-              id="staff-editor-link"
-              href={`${import.meta.env.BASE_URL}admin/`}
-              className="inline-flex items-center p-1 rounded opacity-25 hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-[#c85a32] transition-opacity"
-              aria-label="Staff content editor"
-              title="Staff content editor"
-            >
-              <PenLine className="w-3 h-3" aria-hidden="true" />
-            </a>
+          <p>
+            © {new Date().getFullYear()} Slow Dough Pizza Co. All dough aged with patience.
           </p>
         </div>
       </div>

@@ -9,14 +9,14 @@ code. Every change becomes a **pull request** that is reviewed and merged on Git
 | | |
 |---|---|
 | Live site | https://smagara.github.io/SlowDoughPizzaSite_Sveltia/ |
-| Content editor | https://smagara.github.io/SlowDoughPizzaSite_Sveltia/admin/ (hidden ✎ link in the footer) |
+| Content editor | https://smagara.github.io/SlowDoughPizzaSite_Sveltia/admin/ — **not linked from the site**; editors bookmark it |
 | Technical design | [`docs/Technical-Design-Document.docx`](docs/Technical-Design-Document.docx) |
 | Manager guide | [`docs/Manager-Quick-Guide.pdf`](docs/Manager-Quick-Guide.pdf) |
 
 ## How it works
 
 ```
-Manager ──edits──▶ /admin/ (Sveltia CMS, runs in the browser)
+Manager ──edits──▶ /admin/ (Sveltia CMS, runs in the browser; unlinked URL, noindex)
                       │  GitHub API (signed-in collaborator only)
                       ▼
             branch cms/<collection>/<slug>  ──▶  Pull request → main   (draft → "In review")
@@ -35,6 +35,27 @@ Manager ──edits──▶ /admin/ (Sveltia CMS, runs in the browser)
 * **Workflows**: [`.github/workflows/pr-check.yml`](.github/workflows/pr-check.yml) (every PR) and
   [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) (every push to `main`).
 
+### The editor URL is unlisted, not secret
+
+Nothing on the public site links to `/admin/` and the page carries `noindex, nofollow`, so it is not
+discoverable by visitors or well-behaved crawlers. It is still a public URL: anyone who guesses it
+sees a sign-in page and nothing else — access is enforced by GitHub (collaborators only), not by
+obscurity. Share the address with editors privately (no `robots.txt` entry on purpose: that would
+advertise the path).
+
+### Inside the editor
+
+* **Preview pane** renders the page section being edited in the website's own look (menu cards,
+  top banner and header, hours table, blog card + essay) and updates as you type
+  (`src/admin/preview/`).
+* **No media uploads.** The site has no image fields (artwork is inline SVG), so the Assets area is
+  removed from the UI (`src/admin/theme.css`) and uploads are rejected outright
+  (`media_libraries.default.config.max_file_size: 0` in `src/admin/config.ts`), even on the direct
+  `#/assets` route.
+* **Sign-in is remembered.** After a successful sign-in the editor opens directly on the next visit;
+  the login page — and with it the **Work with Local Repository** option on localhost — reappears
+  after *Sign Out* (account menu, top right).
+
 ## Run locally
 
 **Prerequisites:** Node.js ≥ 22.6
@@ -50,6 +71,11 @@ On `localhost` the editor's login page offers **Work with Local Repository** (Ch
 the File System Access API). Pick the repository folder; edits are written straight into
 `content/` and the dev server hot-reloads the site. Commit them with git as usual. Nothing is sent
 to GitHub in this mode, and no pull request is created.
+
+Two things to know: the option only appears when the address bar says `localhost` or `127.0.0.1`
+(not the LAN URL Vite also prints), and it is only on the *login page* — if you previously signed
+in (local or GitHub) the editor reopens in that mode; choose **Sign Out** to get back to the login
+page and pick the other mode.
 
 ### Other scripts
 
@@ -121,6 +147,8 @@ refreshes the screenshots in `docs/images/cms/`.
 | `npm run build` prints "chunks are larger than 500 kB". | Expected for the editor entry (Sveltia CMS is a pre-built ~2 MB app; its sub-features are lazy chunks). `build.chunkSizeWarningLimit` is raised in `vite.config.ts` so the warning only fires for real regressions. |
 | `npm run build` prints `[PLUGIN_TIMINGS] JavaScript callbacks ran for …`. | An informational diagnostic from Rolldown (Vite 8's bundler) about time spent in JavaScript plugins — it is not an error. The project's own plugins use hook filters so they only run for the files they handle; the remaining time is the React and Tailwind plugins. Profile with `node --cpu-prof` if it grows. |
 | `npm run test:e2e` fails to start with a browser error. | Run `npm run test:e2e:setup` once. |
+| "Work with Local Repository" is not offered any more. | You are still signed in from a previous session (the editor skips the login page), or the page was opened via a non-`localhost` address. Sign out from the account menu, or open `http://localhost:3000/admin/`. |
+| The logo / login page looks odd in dark mode. | Fixed in v1.2 (the logo tile now has a light background and terracotta ring so it renders on both themes). Hard-refresh to pick up the new build. |
 
 ## Project layout
 
@@ -130,8 +158,8 @@ content/                    CMS-managed content (JSON + Markdown)
 docs/                       design document, manager guide, screenshots
 public/admin/logo.svg       editor logo / favicon
 scripts/validate-content.ts CI content validator (rules come from src/admin/config.ts)
-src/admin/                  Sveltia CMS bootstrap, typed config, site-themed skin
-src/components/             React UI (Markdown.tsx renders blog bodies safely)
+src/admin/                  Sveltia CMS bootstrap, typed config, site-themed skin, preview/ templates
+src/components/             React UI (Markdown.tsx renders blog bodies safely; no link to the editor)
 src/content/index.ts        typed loader for everything under content/
 tests/e2e/                  offline end-to-end test + simulated GitHub API
 tools/                      Vite plugins (Markdown front matter import, build-time CSP)
