@@ -1,0 +1,14 @@
+{
+  "name": "Diavola Napoletana",
+  "label": "Neapolitan Pizzas (Pizze Nap… › Diavola Napoletana — $22",
+  "section": "Neapolitan Pizzas (Pizze Napoletane)",
+  "italianName": "Pizza alla Diavola con Peperoncino",
+  "description": "San Marzano D.O.P. sauce, smoked provola affumicata cheese, artisan spicy salame napoletano, crushed fermented Calabrian hot chili paste, wild mountain oregano.",
+  "price": 22,
+  "tags": [
+    "Spicy",
+    "House Favorite"
+  ],
+  "order": 50,
+  "visible": true
+}

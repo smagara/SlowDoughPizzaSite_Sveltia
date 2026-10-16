@@ -105,7 +105,7 @@ TABLE(["Item", "Value"], [
     ["Repository", "https://github.com/smagara/SlowDoughPizzaSite_Sveltia"],
     ["Live site", "https://smagara.github.io/SlowDoughPizzaSite_Sveltia/"],
     ["Content editor", "https://smagara.github.io/SlowDoughPizzaSite_Sveltia/admin/ — unlisted URL, not linked from the site (v1.2)"],
-    ["Document version", "1.2 — " + datetime.date.today().strftime("%d %B %Y") + " (see §16 Revision history)"],
+    ["Document version", "1.3 — " + datetime.date.today().strftime("%d %B %Y") + " (see §16 Revision history)"],
     ["Status", "Prototype — implemented and verified offline with an end-to-end test; production sign-in (OAuth helper) and branch protection require one-time owner setup (§12)"],
     ["Audience", "Site owner, developers maintaining the site, reviewers of content pull requests"],
     ["Companion document", "Manager Quick Guide (docs/Manager-Quick-Guide.pdf) — 2-page instructions for the pizza manager"],
@@ -171,7 +171,9 @@ TABLE(["Concern", "Choice", "Notes"], [
 H("4. Content model")
 P("All editor-managed content lives under content/. These are the only files the manager ever changes. Everything else (layout, copy that is not expected to change, styling) stays in source code under the developer's control.")
 TABLE(["File", "Format", "Editor entry", "Used by"], [
-    ["content/menu.json", "JSON — `intro`, `categories[]` → `items[]`", "Site Content → Daily Menu", "MenuSection.tsx"],
+    ["content/menu-items/<slug>.json", "JSON — `name`, `label` (computed: Section › Name — $price), `section` (title of a menu section), `italianName`, `description`, `price`, `tags[]`, `order`, `visible`", "Menu Items (one entry per dish/drink)", "MenuSection.tsx via the loader"],
+    ["content/menu-sections/<slug>.json", "JSON — `title`, `subtitle`, `order`", "Menu Sections (one entry per heading)", "MenuSection.tsx via the loader"],
+    ["content/menu.json", "JSON — `intro`", "Site Content → Menu Introduction", "MenuSection.tsx"],
     ["content/announcement.json", "JSON — `enabled`, `headline`, `detail`", "Site Content → Dough Announcement", "Navbar.tsx (top banner)"],
     ["content/hours.json", "JSON — `days[7]` (day, hours, statusNote, isClosed)", "Site Content → Opening Hours", "HoursAndLocation.tsx"],
     ["content/blog/<slug>.md", "Markdown body + YAML front matter (title, subtitle, author, authorRole, date, artType, excerpt, keyTakeaways[], visible)", "Blog Posts (one entry per file)", "ArticlesSection.tsx via Markdown.tsx"],
@@ -179,13 +181,16 @@ TABLE(["File", "Format", "Editor entry", "Used by"], [
 H("4.1 Loader and derived fields", 2)
 P("src/content/index.ts is the single import point. It gives every consumer a typed object (src/types.ts) and derives what the editor should not have to maintain:")
 for s in [
+    "The Daily Menu is assembled from three sources: sections sorted by `order`, items (with `visible: true`) sorted by `order` then name and attached to their section by title, and the introduction. An item whose section title matches no section is left out with a console warning (the CI validator rejects it earlier).",
     "Stable `id`s for menu categories and items are generated from their names (slugified, de-duplicated) — used for React keys and DOM ids. Editors never see or type ids.",
     "Blog posts are sorted newest-first by `date`; posts with `visible: false` are excluded; `readTime` is computed from the word count; `publishedDate` is formatted for display from the ISO date.",
     "Booleans and optional strings are normalised so components can rely on their presence.",
 ]: B(s)
 H("4.2 Markdown import at build time", 2)
 P("A small Vite plugin (tools/vite-plugin-markdown-content.ts) turns each content/blog/*.md file into a JSON module {frontmatter, body, file} during the build. Front matter is parsed with the yaml package in Node, so no YAML parser ships to the browser. The Markdown body is rendered at runtime by the Markdown component (§9.4). Adding a blog post therefore never requires a code change — import.meta.glob picks up new files automatically.")
-H("4.3 Why JSON for structured data and Markdown for posts", 2)
+H("4.3 Why one file per menu item (v1.3)", 2)
+P("Versions 1.0–1.2 kept the whole menu in one menu.json with nested lists. That is the simplest editing screen, but every change — a price, a typo, a new dish — produced the same pull request (“update Site Content ‘menu’”) and the same workflow card (“Daily Menu”), which the kitchen staff could not tell apart. Sveltia's workflow cards and PR titles can only show an entry's identifier, so the granularity of the content model is the granularity of the review process. Splitting the menu into one JSON file per item (and per section) gives: a card and a pull request per dish that read “Neapolitan Pizzas (Pizze Nap… › Margherita Verace D.O.P. — $21”; small, readable diffs; no conflicts when two people edit different dishes; a per-item “Show on menu” switch for sold-out or seasonal dishes; and a grouped, sortable item list in the editor. The cost is that ordering is expressed with position numbers instead of drag-and-drop and that a section rename must be repeated on its items (§14).")
+H("4.4 Why JSON for structured data and Markdown for posts", 2)
 P("JSON is imported natively by Vite with no tooling, parses strictly (a malformed file fails the build instead of silently rendering wrong), and Sveltia writes it deterministically (2-space indentation configured in `output.json`) so pull-request diffs show only the lines that changed. Markdown with YAML front matter is the idiomatic Sveltia format for posts: it gives the manager a rich-text editor for the body while keeping metadata as structured fields, and a reviewer can read the whole post in the pull request.")
 
 # ================================================================== 5
@@ -199,7 +204,9 @@ B("**TypeScript configuration instead of admin/config.yml.** src/admin/config.ts
 H("5.3 Collections and fields", 2)
 TABLE(["Collection / file", "Key fields and rules"], [
     ["Blog Posts (folder collection `blog`)", "title (3–120 chars, no < >), subtitle, author, authorRole, date (YYYY-MM-DD, default today), artType (select: dough | oven), excerpt (20–300 chars), keyTakeaways (list of ≤5 strings), visible (boolean), body (Markdown; toolbar limited to bold, italic, H2, H3, quote, lists, link; no images/code/HTML; rejects HTML tags). Slug from title, editable on creation, pattern ^[a-z0-9]+(-[a-z0-9]+)*$."],
-    ["Site Content → Daily Menu", "intro (≤400 chars); categories (1–8, reorderable) each with title (≤80), subtitle (≤200), items (1–30, reorderable) with name (2–80), italianName, description (≤300), price (number 0–500, step 0.5), tags (multi-select from a fixed badge vocabulary)."],
+    ["Menu Items (folder collection `menu-items`, JSON)", "name (2–80, no < >), label (compute widget: `{{fields.section | truncate(28)}} › {{fields.name}} — ${{fields.price}}`, used as the identifier so it is what cards and the GitHub PR list show), section (relation to Menu Sections, stored as the section title), italianName, description (≤300), price (0–500, step 0.5), tags (fixed badge vocabulary), order (1–999, default 50), visible (boolean). Slug from the name; list grouped by section and sorted by order."],
+    ["Menu Sections (folder collection `menu-sections`, JSON)", "title (2–80), subtitle (≤200), order (1–999). Summary “order · title”."],
+    ["Site Content → Menu Introduction", "intro (≤400 chars)."],
     ["Site Content → Dough Announcement", "enabled (boolean), headline (3–80 chars), detail (≤80 chars)."],
     ["Site Content → Opening Hours", "days: exactly 7 rows; day is read-only; hours (≤40), statusNote (≤80), isClosed (boolean). Adding/removing/reordering days is disabled."],
 ], widths=[4.5, 12])
@@ -242,7 +249,7 @@ TABLE(["Step", "What happens", "Where"], [
 H("7.1 Conventions", 2)
 TABLE(["Item", "Value"], [
     ["Base branch", "The repository's default branch, detected by Sveltia at sign-in (`backend.branch` is intentionally not set — see D15). It must be `main`, which is what the workflows build and deploy."],
-    ["Branch name", "cms/<collection>/<slug>, e.g. cms/site/menu, cms/blog/harvest-special-pumpkin-sage. One branch (and one PR) per entry; further saves of the same entry add commits to the same branch."],
+    ["Branch name", "cms/<collection>/<slug>, e.g. cms/menu-items/margherita-verace-d-o-p, cms/blog/harvest-special-pumpkin-sage. One branch (and one PR) per entry; further saves of the same entry add commits to the same branch."],
     ["PR title / commit message", "content: add|update|remove <Collection label> “<slug>” (configured in `backend.commit_messages`)"],
     ["PR body", "“Automatically generated by Sveltia CMS”"],
     ["Labels", "sveltia-cms/draft → sveltia-cms/pending_review (→ sveltia-cms/pending_publish is unused because publishing from the editor is disabled)"],
@@ -251,8 +258,15 @@ TABLE(["Item", "Value"], [
     ["Deleting an entry", "Deleting a blog post in the editor also goes through a pull request (label sveltia-cms/pending_deletion); nothing is removed from main without review."],
     ["Discarding", "The manager can discard an unpublished change from the Editorial Workflow board; Sveltia closes the PR and deletes the branch."],
 ], widths=[3.8, 12.7], font=9)
-H("7.2 What the reviewer sees", 2)
-P("The pull request's Files changed tab shows a line-level diff of a JSON or Markdown file (e.g. `\"price\": 19` → `\"price\": 21`). The PR check summary lists the changed files. Because the validator and the build run on the exact merge result, a green check means the site will build with that content. If the check is red, the job log names the file, field and rule that failed (e.g. “content/menu.json: categories[0].items[2].description is longer than 300 characters”).")
+H("7.2 Pull-request lifecycle versus the lanes — and why there is no “Published” lane", 2)
+P("During the first production use the owner observed that pull requests exist while entries are still in Drafts and proposed a read-only final lane, “Published”, that would be the moment the pull request is actually opened. The proposal was examined against how Sveltia and GitHub work; the conclusion is to keep the standard behaviour, for the following reasons.")
+B("**A lane is a label, a card is a pull request.** Sveltia stores no workflow state of its own: the Drafts/In Review/Ready columns are populated by listing the repository's open pull requests that carry a sveltia-cms/* label, and the position of a card is that label. The first Save therefore must create the branch and the pull request — there is nowhere else to keep a draft that another device, another editor or a reviewer could see. (Sveltia's “draft backup” in the browser only protects unsaved typing on one machine.)")
+B("**Lane moves do not create pull requests.** Moving a card relabels the same PR and toggles GitHub's draft flag (Drafts ⇄ ready for review). The end-to-end test moves an entry In Review → Draft → In Review and asserts that exactly one pull request exists; the owner's own screenshot of PR #3 shows the same: one PR, labels added/removed as the card moved.")
+B("**GitHub's draft pull request is the “not yet” state the proposal asked for.** While a card sits in Drafts its PR is a draft PR: GitHub does not request reviews for it, reviewers filter it out with `is:pr draft:false`, the merge button is disabled, and the required status check still runs so problems surface early. “Send for Review” is the moment the team is asked to look. A “Published” lane cannot exist as a column because a merged PR is closed and leaves the board — publication is visible on the website and in GitHub's merged list instead.")
+B("**Alternatives considered.** (a) `publish_mode: simple` (no workflow): every save commits straight to main — rejected by the brief. (b) Open Authoring: drafts live in a fork, but a PR is still opened at the same time. (c) A custom “save locally, open PR later” mode: not supported by Sveltia and would hide drafts from everyone but one browser. (d) Hiding the Ready column: not configurable; it is harmless (moving there only relabels) and the guide tells staff to use Draft and In Review only.")
+P("What was changed instead is the *legibility* of the cards and pull requests: item-level entries (§4.3) with a computed label, so the board reads “Section › Item — $price” and the PR list reads “update Menu Item ‘<slug>’”.")
+H("7.3 What the reviewer sees", 2)
+P("The pull request's Files changed tab shows a line-level diff of a JSON or Markdown file (e.g. `\"price\": 19` → `\"price\": 21`, plus the recomputed label line). The PR check summary lists the changed files. Because the validator and the build run on the exact merge result, a green check means the site will build with that content. If the check is red, the job log names the file, field and rule that failed (e.g. “content/menu.json: categories[0].items[2].description is longer than 300 characters”).")
 
 # ================================================================== 8
 H("8. Build and deployment (CI/CD)")
@@ -318,7 +332,8 @@ P("Because the critical behaviour (branch, commit, pull request, labels, draft s
 TABLE(["#", "Scenario", "Asserts"], [
     ["1", "Editor page loads on localhost", "Title, local + GitHub sign-in buttons, site accent colour applied"],
     ["2", "Non-collaborator signs in", "Access denied message; no content loaded"],
-    ["3", "Edit menu price → Save → Send for Review", "Site-styled preview rendered (menu cards); Assets UI hidden; branch cms/site/menu from main; commit touches only content/menu.json; draft PR → main with label sveltia-cms/draft; after sending: ready for review + sveltia-cms/pending_review; main unchanged; committed JSON well-formed with numeric price; no Publish button"],
+    ["3", "Edit a menu item's price → Save → Send for Review → lane moves", "Item preview rendered and follows the price; branch cms/menu-items/<slug> from main; commit touches only content/menu.json; draft PR → main with label sveltia-cms/draft; after sending: ready for review + sveltia-cms/pending_review; main unchanged; committed JSON well-formed, numeric price, computed label, stable key order; In Review → Draft → In Review relabels the same PR (still exactly one); workflow card reads “Menu Item / Neapolitan Pizzas (Pizze Nap… › Margherita Verace D.O.P. — $21”; Assets UI hidden; no Publish button"],
+    ["9", "Stale URL #/collections/settings", "Hash removed on load with a console breadcrumb; after sign-in the Menu Items list is shown, no “Collection not found”"],
     ["4", "Script/HTML in title and body", "Both custom error messages shown; save blocked; zero API calls"],
     ["5", "Create a blog post with heading, quote, takeaways", "Branch cms/blog/<slug>; Markdown file parses with the build plugin; front matter fields correct; PR title"],
     ["6", "Edit the announcement banner", "Preview strip updates live; branch cms/site/announcement with the new headline; upload on the direct /assets route rejected (0 bytes), nothing committed"],
@@ -347,6 +362,8 @@ TABLE(["Task", "How"], [
     ["Add a new editable field", "Add the field to config.ts, the type in src/types.ts, the loader in src/content/index.ts and the component; the validator picks the rule up automatically."],
     ["Upgrade Sveltia CMS", "`npm update @sveltia/cms`, run `npm run check` and `npm run test:e2e`, deploy."],
     ["Manager lost their token / new manager", "Token mode: create a new fine-grained token (Contents + Pull requests read/write on this repo). OAuth mode: nothing to do beyond collaborator access."],
+    ["After sign-in: empty page, “Collection not found.” + Back button", "The URL names a collection that does not exist (observed: …/admin/#/collections/settings — a bookmark from an earlier configuration). v1.3 drops such a hash on load and opens the start page; otherwise open the plain editor URL."],
+    ["Sidebar labels clipped (“Site Conte…”) on laptop-sized windows; wordmark overlapping the logo border on Windows", "Fixed in v1.3 (sidebar minimum width in theme.css; textLength in logo.svg). Hard-refresh to load the new build."],
     ["“Work with Local Repository” no longer offered (developer machine)", "Still signed in from a previous session (login page skipped) or opened via a non-localhost address. Sign Out from the account menu, or open http://localhost:3000/admin/."],
     ["Editor shows no existing content (Blog Posts 0, empty fields) but can create items", "The branch the editor reads has no content/ folder. Check which branch holds content/ and make it the default branch (must be main for deployment). If the branch is right, clear a stale editor cache: sign out, clear site data for the editor URL, sign in again."],
 ], widths=[4.5, 12], font=9)
@@ -361,6 +378,8 @@ TABLE(["ID", "Decision", "Alternatives considered", "Rationale / consequences"],
     ["D5", "OAuth via Sveltia CMS Authenticator on Cloudflare Workers, with token sign-in as fallback and the OAuth button hidden until configured", "Netlify Identity/Git Gateway; self-hosted OAuth server; token only", "Officially supported, free, stateless; no broken button before setup; token mode gives a working prototype on day one"],
     ["D6", "v1.0: hidden-but-accessible footer link. v1.2: no link at all — unlisted /admin/ URL, noindex, no robots.txt entry", "Invisible link; keyboard shortcut; robots.txt Disallow", "Owner asked for the editor to be hidden from visitors and bots; an unlisted URL is the cleanest way. Security still relies on GitHub auth, not obscurity"],
     ["D7", "Brand Sveltia's UI with CSS custom properties and a logo instead of building a custom form; v1.2 adds site-styled preview templates", "Custom React form calling the GitHub API; generic field-dump preview", "Reuses Sveltia's validation, rich-text editor, workflow UI and accessibility; the preview shows staff what they are editing in the website's own look, with Sveltia's sanitised Markdown widget embedded for the essay body"],
+    ["D17", "One JSON file per menu item and per menu section; computed `label` field as the item identifier (v1.3)", "Keep single menu.json; one file per section only; rewrite PR titles with a GitHub Action that diffs the JSON", "Cards/PR titles can only show an entry's identifier, so granularity must live in the content model; a diff-rewriting Action would help GitHub but not the board. Per-item files also give small diffs, conflict-free parallel edits and a per-dish visibility switch"],
+    ["D18", "Keep Sveltia's standard PR lifecycle (draft PR at first save, relabel on lane moves); no “Published” lane (v1.3)", "Open the PR only when leaving Drafts; a custom local-draft mode; simple publish mode", "Workflow state lives in GitHub by design — a draft without a PR is invisible to everyone else; GitHub draft PRs already express “not yet”; merged PRs leave the board, so “Published” is the website itself (§7.2)"],
     ["D16", "Remove media uploads: hide asset entry points via CSS and set max_file_size: 0 (v1.2)", "Drop media_folder (rejected by Sveltia's validator); declare an unconfigured cloud library (leaves broken leftovers and a page error on /assets)", "No image fields exist; both measures together remove the UI and make uploads impossible even by URL; trivially reversible when images are wanted"],
     ["D8", "Validation rules expressed once in config.ts and re-applied by a CI script; plus anti-markup regexes on every text field", "Browser-only validation; a separate JSON Schema", "Single source of truth; server-side guarantee that nothing unvalidated reaches main or the build"],
     ["D9", "react-markdown with an element whitelist and `skipHtml` for blog bodies", "Build-time Markdown → HTML + DOMPurify; custom mini-renderer", "No innerHTML anywhere; safe by construction; small runtime cost"],
@@ -380,6 +399,8 @@ for q in [
     "**Preview of a pending change.** GitHub Pages has no per-PR previews. The reviewer sees a text diff (plus a green build). If a visual preview is needed, a follow-up could publish PR builds to a preview folder or another host and use Sveltia's deploy-preview link support.",
     "**Images.** No image fields are exposed (the site uses inline SVG art). If photos are wanted, decide on a media folder under public/uploads (with size/type limits) or an external media library; the validator would need an asset check.",
     "**More editable areas.** Hero copy, contact details, the “Batch Capacity” notice and the header hours badge are still hard-coded. They can be moved to content/ with the same pattern if routine updates are expected.",
+    "**Renaming a menu section.** Items refer to their section by title (so diffs and cards stay human-readable). Renaming a section therefore needs the items re-pointed (the CI validator flags any item whose section no longer exists). If renames turn out to be frequent, switch the relation to the section slug and resolve titles in the loader.",
+    "**Group order in the Menu Items list.** Sveltia orders groups alphabetically, not by the sections' `order`; the website uses `order`. Prefixing section titles with numbers would align both at the cost of uglier headings.",
     "**Menu badge vocabulary.** Badges are a fixed list (MENU_TAGS). Confirm the list, and whether the manager should be able to add new badges (free text) at the cost of looser validation.",
     "**Date of blog posts.** Posts are listed by `date`; future-dated posts are shown immediately. Should scheduling (hide until date) be added?",
     "**Token lifetime.** Fine-grained tokens expire (max 1 year). If token mode is used long-term, decide on a renewal reminder or move to OAuth.",
@@ -404,6 +425,7 @@ TABLE(["Risk", "Impact", "Mitigation"], [
 H("16. Revision history")
 TABLE(["Version", "Change", "Trigger"], [
     ["1.0", "Initial design and implementation.", "—"],
+    ["1.3", "Menu split into one entry per item and per section with a computed “Section › Item — $price” label that the workflow cards and PR list show (§4.3, §5.3, D17). Pull-request lifecycle analysed and documented; “Published lane” proposal declined with reasons (§7.2, D18); e2e test asserts that lane moves relabel a single PR. Route guard for stale #/collections/<unknown> URLs (§12). Sidebar minimum width; logo wordmark fitted with textLength.", "Owner feedback with screenshots: “Collection not found” after OAuth sign-in (URL …/#/collections/settings); workflow cards indistinguishable for menu edits; PRs present while entries are drafts; sidebar labels clipped; wordmark overlapping the logo border."],
     ["1.2", "Footer link removed — editor reachable only via the unlisted /admin/ URL (§5.4, D6). Media uploads removed (§5.6, D16). Site-styled live preview templates for menu, announcement, hours and blog (§5.5). Logo redrawn for the dark theme. Documented the remembered sign-in / Sign Out behaviour and the localhost-only local option (§10, §12). E2e test extended accordingly.", "Owner feedback after the first production use: keep the editor hidden from the public and bots; no media uploads; preview should look like the website; local option “disappeared” after the first sign-in; a visual defect."],
     ["1.1", "`backend.branch` removed so the editor follows the repository's default branch (D15); runbook step 0 and troubleshooting entry added (§12, §15). Build log reviewed: chunk-size limit raised for the editor bundle, hook filters added to the project's Vite plugins, config-loader notice fixed (§8.3). End-to-end test: raw-Markdown input instead of simulated keystrokes, explicit browser-setup script and hint (§11).", "First external deployment and test run: editor showed no existing data although creating entries and the pull request worked; two build warnings; one flaky scenario; Playwright browser not installed."],
 ], widths=[1.6, 10, 4.9], font=9)
@@ -412,7 +434,7 @@ TABLE(["Version", "Change", "Trigger"], [
 doc.add_page_break()
 H("Appendix A — File inventory (added or changed)")
 TABLE(["Path", "Role"], [
-    ["content/menu.json, announcement.json, hours.json, blog/*.md", "Editable content (the manager's files)"],
+    ["content/menu-items/*.json, menu-sections/*.json, menu.json, announcement.json, hours.json, blog/*.md", "Editable content (the manager's files)"],
     ["src/content/index.ts", "Typed content loader (ids, sorting, derived fields)"],
     ["src/types.ts", "Content types (kept in sync with config.ts)"],
     ["src/components/Markdown.tsx", "Safe Markdown renderer for blog bodies"],
@@ -432,13 +454,13 @@ H("Appendix B — Editor screenshots")
 P("All screenshots were captured by the end-to-end test against the real editor build; the GitHub API was simulated.", italic=True, size=9)
 shots = [
     ("16-production-login", "B-1 — Sign-in page as deployed on GitHub Pages (site theme, logo, no local-mode button)."),
-    ("03-collections", "B-2 — Collections after sign-in: Blog Posts and Site Content (no Assets area)."),
+    ("03-collections", "B-2 — Start page after sign-in: the Menu Items list grouped by section (no Assets area)."),
     ("04-site-content", "B-3 — Site Content: Daily Menu, Dough Announcement, Opening Hours."),
-    ("05-menu-editor", "B-4 — Daily Menu editor with the site-styled preview (menu cards, prices, badges)."),
+    ("05-menu-editor", "B-4 — Menu item editor: section picker, fields, and the site-styled preview of the item card."),
     ("06-menu-price-edited", "B-5 — Editing a menu item (price changed; the preview follows)."),
     ("07-send-for-review", "B-6 — After Save: the pull request exists as a draft; the editor offers “Send for Review”."),
     ("08-entry-in-review", "B-7 — The Daily Menu now shows “In Review”; the pull request is ready for review on GitHub."),
-    ("09-workflow-board", "B-8 — Editorial Workflow board (no Publish action for editors)."),
+    ("09-workflow-board", "B-8 — Editorial Workflow board: the card reads “Section › Item — $price” (no Publish action for editors)."),
     ("10-validation-errors", "B-9 — Script/HTML characters rejected in a title and in the essay body."),
     ("12-blog-editor", "B-10 — Blog post editor; the preview renders the post card and essay in the site's journal style."),
     ("13-announcement-editor", "B-11 — Dough announcement editor: the preview shows the strip above the real site header."),

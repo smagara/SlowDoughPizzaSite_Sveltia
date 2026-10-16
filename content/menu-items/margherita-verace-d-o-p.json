@@ -1,0 +1,14 @@
+{
+  "name": "Margherita Verace D.O.P.",
+  "label": "Neapolitan Pizzas (Pizze Nap… › Margherita Verace D.O.P. — $19",
+  "section": "Neapolitan Pizzas (Pizze Napoletane)",
+  "italianName": "Pizza Margherita Tradizionale",
+  "description": "Crushed San Marzano D.O.P. tomatoes, fresh fior di latte mozzarella d’Agerola, aged pecorino romano, organic Genovese basil, cold-pressed extra virgin olive oil.",
+  "price": 19,
+  "tags": [
+    "Neapolitan Classic",
+    "Vegetarian"
+  ],
+  "order": 10,
+  "visible": true
+}

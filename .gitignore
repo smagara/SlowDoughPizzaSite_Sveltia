@@ -149,3 +149,6 @@ build.txt
 # Local scratch files for the e2e harness & test output
 tests/e2e/.scratch/
 test-results/
+
+# Screenshots shared for issue analysis (not part of the site)
+/*.png

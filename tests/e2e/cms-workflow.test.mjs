@@ -4,8 +4,10 @@
  * What it proves (with the real production config and the real Sveltia bundle):
  *   1. The hidden editor loads, is themed, and offers local + GitHub sign-in.
  *   2. Only repository collaborators get in (a non-collaborator is rejected).
- *   3. Editing the Daily Menu and saving creates a feature branch `cms/site/menu`, a commit and a
- *      *draft* pull request against `main`; "Send for Review" marks it ready + labels it.
+ *   3. Editing a menu item and saving creates a feature branch `cms/menu-items/<slug>`, a commit
+ *      and a *draft* pull request against `main`; "Send for Review" marks it ready + labels it;
+ *      moving between workflow lanes only relabels that same PR; the workflow card reads
+ *      "Section › Item — $price".
  *   4. Script/HTML characters in free-text fields are rejected by the form validation.
  *   5. Creating a blog post writes a Markdown file with YAML front matter that the site build can
  *      parse and that passes the CI content validator.
@@ -14,6 +16,8 @@
  *      to /admin/ anywhere on the public page, no "local repository" option outside localhost).
  *   8. The preview pane renders the site-styled templates; the Assets (media upload) UI is hidden
  *      and uploads are rejected even on the direct /assets route.
+ *   9. A stale URL naming a collection that no longer exists (#/collections/settings) opens the
+ *      start page instead of "Collection not found".
  *
  * GitHub's API is simulated in-process (github-mock.mjs) and wired in via Playwright request
  * interception, so no network, tokens or real repository are needed. Screenshots are written to
@@ -118,6 +122,14 @@ async function expandAll(page) {
 
 const shot = (page, name) => page.screenshot({ path: join(shotsDir, `${name}.png`) });
 
+/** The preview pane is an iframe that mounts slightly after the form — wait for it. */
+async function previewFrame(page) {
+  let frame;
+  await until(() => (frame = page.frames().find((f) => f !== page.mainFrame())) !== undefined, 'preview iframe');
+  await frame.locator('.sd-frame').waitFor({ timeout: 20000 });
+  return frame;
+}
+
 /** Poll until `fn()` is truthy (used for side effects in the simulated GitHub API). */
 async function until(fn, what, timeout = 30000) {
   const started = Date.now();
@@ -176,37 +188,35 @@ try {
   });
 
   // ------------------------------------------------------------------ 3. menu → PR
-  await test('editing the Daily Menu creates a feature branch + pull request; Send for Review marks it ready', async () => {
+  await test('editing a menu item creates a feature branch + pull request; lane moves relabel the same PR; card shows Section › Item', async () => {
     const mock = new GitHubMock({ owner: OWNER, repo: REPO, rootDir: root, include: ['content'] });
     const ctx = await githubContext(browser, mock);
     const page = await openEditor(ctx, baseUrl);
     await signInWithToken(page);
     await page.getByText('Collections', { exact: true }).waitFor();
     await page.waitForTimeout(800);
+    assert.match(page.url(), /#\/collections\/menu-items$/, 'editor opens on the Menu Items list');
     await shot(page, '03-collections');
 
     await page.getByText('Site Content', { exact: true }).first().click();
     await page.waitForTimeout(500);
     await shot(page, '04-site-content');
 
-    await page.goto(`${baseUrl}/admin/#/collections/site/entries/menu`);
-    await page.getByText('Menu introduction', { exact: true }).waitFor();
+    await page.goto(`${baseUrl}/admin/#/collections/menu-items/entries/margherita-verace-d-o-p`);
+    await page.getByText('Italian name', { exact: true }).waitFor();
     await page.waitForTimeout(800);
     await shot(page, '05-menu-editor');
 
     // Site-styled preview template (rendered inside the preview iframe)
-    const preview = page.frames().find((f) => f !== page.mainFrame());
-    assert.ok(preview, 'preview iframe present');
-    await preview.locator('.sd-frame').waitFor();
-    assert.match(await preview.locator('.sd-h2').first().innerText(), /Our Daily Menu/);
-    assert.ok((await preview.locator('.sd-card').count()) >= 10, 'menu item cards rendered');
+    const preview = await previewFrame(page);
+    assert.match(await preview.locator('.sd-h3').first().innerText(), /Neapolitan Pizzas/);
+    assert.equal(await preview.locator('.sd-card-highlight').count(), 1, 'item card rendered');
 
-    await expandAll(page);
     const price = page.getByLabel('Price (USD)').locator('input').first();
-    const before = await price.inputValue();
-    assert.equal(before, '19'); // Margherita Verace
+    assert.equal(await price.inputValue(), '19'); // Margherita Verace
     await price.fill('21');
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(400);
+    assert.match(await preview.locator('.sd-price').first().innerText(), /21/, 'preview follows the price');
     await shot(page, '06-menu-price-edited');
 
     await page.getByRole('button', { name: 'Save' }).click();
@@ -219,8 +229,9 @@ try {
       mock.log.map((l) => l.kind),
       ['branch.create', 'commit', 'pull.create', 'labels.add'],
     );
-    assert.equal(mock.log[0].branch, 'cms/site/menu');
-    assert.deepEqual(mock.log[1].additions, ['content/menu.json']);
+    const BRANCH = 'cms/menu-items/margherita-verace-d-o-p';
+    assert.equal(mock.log[0].branch, BRANCH);
+    assert.deepEqual(mock.log[1].additions, ['content/menu-items/margherita-verace-d-o-p.json']);
     assert.equal(mock.log[2].base, 'main');
     assert.equal(mock.log[2].draft, true);
     assert.deepEqual(mock.log[3].labels, ['sveltia-cms/draft']);
@@ -234,25 +245,53 @@ try {
     const pr = mock.pulls[0];
     assert.equal(pr.draft, false, 'PR is marked ready for review');
     assert.deepEqual(pr.labels, ['sveltia-cms/pending_review']);
-    assert.equal(pr.head, 'cms/site/menu');
-    assert.equal(mock.branches.get('main').files.get('content/menu.json'), readFileSync(join(root, 'content/menu.json'), 'utf8'), 'main is untouched');
+    assert.equal(pr.head, BRANCH);
+    assert.equal(pr.title, 'content: update Menu Item “margherita-verace-d-o-p”');
+    assert.equal(
+      mock.branches.get('main').files.get('content/menu-items/margherita-verace-d-o-p.json'),
+      readFileSync(join(root, 'content/menu-items/margherita-verace-d-o-p.json'), 'utf8'),
+      'main is untouched',
+    );
 
-    // The committed JSON is well-formed, 2-space indented and contains the new price
-    const committed = mock.branches.get('cms/site/menu').files.get('content/menu.json');
+    // The committed JSON is well-formed, field-ordered, and the computed review label follows the price
+    const committed = mock.branches.get(BRANCH).files.get('content/menu-items/margherita-verace-d-o-p.json');
     const json = JSON.parse(committed);
-    assert.equal(json.categories[0].items[0].price, 21);
-    assert.equal(typeof json.categories[0].items[0].price, 'number');
-    assert.ok(committed.startsWith('{\n  "intro"'), 'pretty-printed with 2 spaces');
+    assert.equal(json.price, 21);
+    assert.equal(typeof json.price, 'number');
+    assert.equal(json.label, 'Neapolitan Pizzas (Pizze Nap… › Margherita Verace D.O.P. — $21');
+    assert.deepEqual(Object.keys(json), ['name', 'label', 'section', 'italianName', 'description', 'price', 'tags', 'order', 'visible'], 'key order matches the committed files (clean diffs)');
+
+    // Moving between lanes (In Review → Draft → In Review) relabels the SAME pull request
+    await page.goto(`${baseUrl}/admin/#/collections/menu-items/entries/margherita-verace-d-o-p`);
+    await page.getByText('Italian name', { exact: true }).waitFor();
+    const statusButton = page.getByRole('button', { name: /Status/ });
+    await statusButton.waitFor({ timeout: 20000 });
+    for (const [status, label, expected] of [[/Draft/, /Status:\W*Draft/, 2], [/In Review/, /Status:\W*In Review/, 3]]) {
+      // The control is disabled while the previous relabel request is in flight — wait for it.
+      await until(async () => !(await statusButton.isDisabled()), 'status control enabled');
+      await statusButton.click();
+      const option = page.getByRole('menuitemradio', { name: status });
+      await option.waitFor({ timeout: 10000 });
+      await option.click();
+      await until(() => mock.log.filter((l) => l.kind === 'labels.set').length >= expected, `lane move to ${status} recorded`);
+      await until(async () => label.test(await statusButton.innerText()), `header shows ${label}`); // text contains Unicode isolates
+    }
+    assert.equal(mock.pulls.length, 1, 'still exactly one pull request');
+    assert.equal(mock.log.filter((l) => l.kind === 'pull.create').length, 1, 'no second PR was created by lane moves');
+    assert.deepEqual(mock.pulls[0].labels, ['sveltia-cms/pending_review']);
 
     // No media uploads: Assets navigation + toolbar button + "+" menu item are hidden
     assert.equal(await page.locator('button[aria-label="Assets"]:visible').count(), 0, 'Assets nav hidden');
-    assert.equal(await page.locator('button[aria-label="Show Assets"]:visible').count(), 0, '"Show Assets" hidden');
 
-    // No "Publish" control for editors — merging happens on GitHub
+    // Workflow board: the card names the section, the item and the new price; no "Publish" control for editors
     await page.goto(`${baseUrl}/admin/#/workflow`);
     await page.getByText('In Review', { exact: true }).first().waitFor();
     await page.waitForTimeout(600);
     await shot(page, '09-workflow-board');
+    const card = await page.locator('.card').first().innerText();
+    assert.match(card, /Menu Item/);
+    assert.match(card, /Neapolitan Pizzas/);
+    assert.match(card, /Margherita Verace D\.O\.P\. — \$21/);
     assert.equal(await page.getByRole('button', { name: /^Publish/ }).count(), 0);
     await ctx.close();
   });
@@ -355,9 +394,8 @@ ${parsed.body}`);
     const headline = page.getByLabel('Headline').locator('input').first();
     await headline.fill("Today's Dough: 96-Hour Extended Ferment");
     await page.waitForTimeout(600);
-    const preview = page.frames().find((f) => f !== page.mainFrame());
-    await preview.locator('.sd-banner').waitFor();
-    assert.match(await preview.locator('.sd-banner').innerText(), /96-Hour Extended Ferment/, 'preview updates live');
+    const preview = await previewFrame(page);
+    await until(async () => /96-Hour Extended Ferment/.test(await preview.locator('.sd-banner').innerText().catch(() => '')), 'preview updates live');
     await shot(page, '13-announcement-editor');
     await page.getByRole('button', { name: 'Save' }).click();
     await page.getByRole('button', { name: 'Send for Review' }).click();
@@ -459,6 +497,24 @@ ${parsed.body}`);
     await page.getByText('Collections', { exact: true }).waitFor();
     await page.waitForTimeout(600);
     await shot(page, '17-production-collections');
+    await ctx.close();
+  });
+  // ------------------------------------------------------------------ 9. stale route guard
+  await test('a stale URL naming an unknown collection opens the start page instead of "Collection not found"', async () => {
+    const mock = new GitHubMock({ owner: OWNER, repo: REPO, rootDir: root, include: ['content'] });
+    const ctx = await githubContext(browser, mock);
+    const page = await ctx.newPage();
+    const warnings = [];
+    page.on('console', (m) => { if (m.type() === 'warning') warnings.push(m.text()); });
+    await page.goto(`${baseUrl}/admin/#/collections/settings`, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Work with Local Repository' }).waitFor();
+    assert.equal(new URL(page.url()).hash, '', 'stale hash removed before the CMS routed');
+    assert.ok(warnings.some((w) => w.includes('Unknown collection in URL')), 'breadcrumb logged');
+    await signInWithToken(page);
+    await page.getByText('Collections', { exact: true }).waitFor();
+    await page.waitForTimeout(600);
+    assert.match(page.url(), /#\/collections\/menu-items$/);
+    assert.equal(await page.getByText('Collection not found').count(), 0);
     await ctx.close();
   });
 } finally {
