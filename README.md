@@ -26,9 +26,12 @@ Manager ──edits──▶ /admin/ (Sveltia CMS, runs in the browser; unlinked
                                       GitHub Action: validate → build → deploy to Pages
 ```
 
-* **Editable content** lives in plain files under [`content/`](content/):
-  `menu.json`, `announcement.json`, `hours.json` and one Markdown file per blog post in `content/blog/`.
-  The React components import them at build time through [`src/content/index.ts`](src/content/index.ts).
+* **Editable content** lives in plain files under [`content/`](content/): one JSON file per menu
+  item (`menu-items/`) and per menu section (`menu-sections/`), `menu.json` (introduction),
+  `announcement.json`, `hours.json`, and one Markdown file per blog post in `blog/`. The React
+  components import them at build time through [`src/content/index.ts`](src/content/index.ts).
+  Item-level files mean every change is its own pull request and its own card on the review
+  board, labelled `Section › Item — $price`.
 * **CMS configuration** is TypeScript, type-checked against Sveltia's schema: [`src/admin/config.ts`](src/admin/config.ts).
   The same field rules (required, lengths, regex patterns, options) are re-applied server-side by
   [`scripts/validate-content.ts`](scripts/validate-content.ts) in CI.
@@ -129,12 +132,34 @@ refreshes the screenshots in `docs/images/cms/`.
 ## Reviewing a content change
 
 1. The manager saves in the editor → a pull request titled e.g.
-   `content: update Site Content “menu”` appears from branch `cms/site/menu`, labelled
-   `sveltia-cms/pending_review` once they click **Send for Review**.
+   `content: update Menu Item “margherita-verace-d-o-p”` appears from branch
+   `cms/menu-items/margherita-verace-d-o-p`. It is a GitHub **draft** PR (label
+   `sveltia-cms/draft`) until the manager clicks **Send for Review**, which marks it *ready for
+   review* and relabels it `sveltia-cms/pending_review`.
 2. The **PR check** validates the content and builds the site. Open *Files changed* to see the
    exact text diff.
 3. **Approve** and **Squash and merge**. The *Deploy to GitHub Pages* workflow publishes the
-   change within a couple of minutes.
+   change within a couple of minutes; the card disappears from the editor's board.
+
+### One pull request per entry — how the lanes map to GitHub
+
+Sveltia's Editorial Workflow keeps *all* of its state in GitHub: a card on the board **is** an open
+pull request, and the lane **is** the PR's label. Consequently:
+
+| Editor action | GitHub |
+|---|---|
+| First **Save** of an entry | branch `cms/<collection>/<slug>` + commit + **draft** pull request (`sveltia-cms/draft`) |
+| Further saves of the same entry | new commits on the same branch / PR |
+| Move Draft → In Review ("Send for Review") | same PR: label → `sveltia-cms/pending_review`, draft → *ready for review* |
+| Move back to Draft | same PR: label → `sveltia-cms/draft`, *converted to draft* |
+| Reviewer approves + merges | PR merged, branch deleted, card disappears (= published) |
+| Discard (↶ on the card) | PR closed, branch deleted |
+
+A lane move never creates a second pull request (asserted by `npm run test:e2e`). A draft cannot
+exist *without* a PR — that is where Sveltia stores it — so "only open the PR at the end" is not an
+option with this CMS; the draft PR is the parking spot instead. Reviewers can ignore drafts
+entirely with the search `is:pr is:open draft:false` or by watching the
+`sveltia-cms/pending_review` label; GitHub also blocks merging a draft PR.
 
 ## Troubleshooting
 
@@ -147,6 +172,9 @@ refreshes the screenshots in `docs/images/cms/`.
 | `npm run build` prints "chunks are larger than 500 kB". | Expected for the editor entry (Sveltia CMS is a pre-built ~2 MB app; its sub-features are lazy chunks). `build.chunkSizeWarningLimit` is raised in `vite.config.ts` so the warning only fires for real regressions. |
 | `npm run build` prints `[PLUGIN_TIMINGS] JavaScript callbacks ran for …`. | An informational diagnostic from Rolldown (Vite 8's bundler) about time spent in JavaScript plugins — it is not an error. The project's own plugins use hook filters so they only run for the files they handle; the remaining time is the React and Tailwind plugins. Profile with `node --cpu-prof` if it grows. |
 | `npm run test:e2e` fails to start with a browser error. | Run `npm run test:e2e:setup` once. |
+| After signing in: empty page, **"Collection not found."** and a Back button. | The URL names a collection that does not exist (e.g. a bookmark like `…/admin/#/collections/settings` from an earlier configuration). Since v1.3 the editor drops such a hash on load and opens the start page (a `[admin] Unknown collection in URL` line is logged). If it still happens, open the plain editor URL without `#…`. |
+| Collection names clipped in the left sidebar ("Site Conte…") on a laptop-sized window. | Fixed in v1.3 (`src/admin/theme.css` gives the sidebar a minimum width). |
+| The "SLOW DOUGH" wordmark overlaps the logo border (Windows). | Fixed in v1.3 (`textLength` in `public/admin/logo.svg` forces the text to fit regardless of font metrics). |
 | "Work with Local Repository" is not offered any more. | You are still signed in from a previous session (the editor skips the login page), or the page was opened via a non-`localhost` address. Sign out from the account menu, or open `http://localhost:3000/admin/`. |
 | The logo / login page looks odd in dark mode. | Fixed in v1.2 (the logo tile now has a light background and terracotta ring so it renders on both themes). Hard-refresh to pick up the new build. |
 
@@ -154,7 +182,7 @@ refreshes the screenshots in `docs/images/cms/`.
 
 ```
 admin/index.html            entry of the hidden editor (→ dist/admin/)
-content/                    CMS-managed content (JSON + Markdown)
+content/                    CMS-managed content: menu-items/, menu-sections/, blog/ (one file each), menu/announcement/hours JSON
 docs/                       design document, manager guide, screenshots
 public/admin/logo.svg       editor logo / favicon
 scripts/validate-content.ts CI content validator (rules come from src/admin/config.ts)

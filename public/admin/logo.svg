@@ -7,5 +7,5 @@
   <circle cx="55" cy="44" r="3.2" fill="#c85a32"/>
   <circle cx="52" cy="58" r="3.2" fill="#c85a32"/>
   <circle cx="41" cy="59" r="2.4" fill="#335928"/>
-  <text x="48" y="20" text-anchor="middle" font-family="Georgia, serif" font-size="10.5" font-weight="700" fill="#24211e" letter-spacing="1.4">SLOW DOUGH</text>
+  <text x="48" y="20" text-anchor="middle" font-family="Georgia, serif" font-size="10" font-weight="700" fill="#24211e" textLength="68" lengthAdjust="spacingAndGlyphs">SLOW DOUGH</text>
 </svg>

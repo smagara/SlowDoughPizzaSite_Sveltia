@@ -1,0 +1,14 @@
+{
+  "name": "Castelfranco & Shaved Parmigiano",
+  "label": "Small Plates & Fresh Greens › Castelfranco & Shaved Parmigiano — $14",
+  "section": "Small Plates & Fresh Greens",
+  "italianName": "Insalata di Radicchio",
+  "description": "Speckled Castelfranco radicchio, shaved 24-month Parmigiano-Reggiano, toasted pine nuts, white Modena balsamic vinaigrette.",
+  "price": 14,
+  "tags": [
+    "Gluten-Free",
+    "Vegetarian"
+  ],
+  "order": 10,
+  "visible": true
+}

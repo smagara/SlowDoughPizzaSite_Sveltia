@@ -3,7 +3,7 @@
  *
  * Sveltia renders these React components in the preview pane (a sandboxed iframe) whenever the
  * matching entry is edited: file collections are matched by *file* name (menu, announcement,
- * hours), folder collections by *collection* name (blog). The markup mirrors the public site's
+ * hours), folder collections by *collection* name (menu-items, menu-sections, blog). The markup mirrors the public site's
  * components (MenuSection, Navbar banner, HoursAndLocation, ArticlesSection) using the plain CSS
  * classes defined in ./preview.css — Tailwind is not available inside the preview iframe.
  *
@@ -50,66 +50,107 @@ const Frame = ({ section, children }: { section: string; children: ReactNode }) 
 );
 
 // ---------------------------------------------------------------------------
-// Daily Menu  (content/menu.json → MenuSection.tsx)
+// Daily Menu (MenuSection.tsx) — intro file, one section entry, one item entry
 // ---------------------------------------------------------------------------
 const badgeClass = (tag: string) =>
   tag === 'Vegetarian' || tag === 'Vegan' ? 'sd-badge sd-badge-green' : tag === 'House Favorite' ? 'sd-badge sd-badge-terra' : 'sd-badge';
 
-export const MenuPreview = (props: CustomPreviewTemplateProps) => {
-  const d = data(props);
-  const categories: Data[] = Array.isArray(d.categories) ? d.categories : [];
+const MenuHeading = ({ intro }: { intro?: ReactNode }) => (
+  <div className="sd-center">
+    <span className="sd-eyebrow">Seasonal Artisanal Selections</span>
+    <h2 className="sd-h2">Our Daily Menu</h2>
+    {intro !== undefined && <p className="sd-lede">{intro}</p>}
+  </div>
+);
+
+const ItemCard = ({ item, highlight = false }: { item: Data; highlight?: boolean }) => {
+  const tags: string[] = Array.isArray(item.tags) ? item.tags.map(text) : [];
   return (
-    <Frame section="Our Daily Menu">
-      <section className="sd-section">
-        <div className="sd-center">
-          <span className="sd-eyebrow">Seasonal Artisanal Selections</span>
-          <h2 className="sd-h2">Our Daily Menu</h2>
-          <p className="sd-lede">{text(d.intro) || <em className="sd-empty">Menu introduction…</em>}</p>
+    <div className={`sd-card${highlight ? ' sd-card-highlight' : ''}`}>
+      <div className="sd-card-top">
+        <div>
+          <h4 className="sd-h4">{text(item.name) || <em className="sd-empty">Item name</em>}</h4>
+          {text(item.italianName) && <span className="sd-italian">{text(item.italianName)}</span>}
         </div>
-        <div className="sd-pills">
-          <span className="sd-pill sd-pill-active">Full Menu</span>
-          {categories.map((c, i) => (
-            <span key={i} className="sd-pill">
-              {text(c.title).split('(')[0].trim() || `Section ${i + 1}`}
+        <span className="sd-price">{item.price === '' || item.price === undefined ? '$—' : `$${item.price}`}</span>
+      </div>
+      <p className="sd-desc">{text(item.description)}</p>
+      {tags.length > 0 && (
+        <div className="sd-tags">
+          {tags.map((t) => (
+            <span key={t} className={badgeClass(t)}>
+              {(t === 'Vegetarian' || t === 'Vegan') && <span className="sd-leaf">❧</span>}
+              {t}
             </span>
           ))}
         </div>
-        {categories.length === 0 && <p className="sd-empty">No menu sections yet — add one on the left.</p>}
-        {categories.map((c, i) => (
-          <div key={i} className="sd-category">
-            <div className="sd-category-head">
-              <h3 className="sd-h3">{text(c.title) || <em className="sd-empty">Section title</em>}</h3>
-              {text(c.subtitle) && <p className="sd-category-sub">{text(c.subtitle)}</p>}
-            </div>
-            <div className="sd-grid">
-              {(Array.isArray(c.items) ? c.items : []).map((item: Data, j: number) => {
-                const tags: string[] = Array.isArray(item.tags) ? item.tags.map(text) : [];
-                return (
-                  <div key={j} className="sd-card">
-                    <div className="sd-card-top">
-                      <div>
-                        <h4 className="sd-h4">{text(item.name) || <em className="sd-empty">Item name</em>}</h4>
-                        {text(item.italianName) && <span className="sd-italian">{text(item.italianName)}</span>}
-                      </div>
-                      <span className="sd-price">{item.price === '' || item.price === undefined ? '$—' : `$${item.price}`}</span>
-                    </div>
-                    <p className="sd-desc">{text(item.description)}</p>
-                    {tags.length > 0 && (
-                      <div className="sd-tags">
-                        {tags.map((t) => (
-                          <span key={t} className={badgeClass(t)}>
-                            {(t === 'Vegetarian' || t === 'Vegan') && <span className="sd-leaf">❧</span>}
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+      )}
+    </div>
+  );
+};
+
+/** content/menu.json — the introduction paragraph under the heading. */
+export const MenuIntroPreview = (props: CustomPreviewTemplateProps) => {
+  const d = data(props);
+  return (
+    <Frame section="Our Daily Menu — introduction">
+      <section className="sd-section">
+        <MenuHeading intro={text(d.intro) || <em className="sd-empty">Menu introduction…</em>} />
+        <div className="sd-pills">
+          <span className="sd-pill sd-pill-active">Full Menu</span>
+          <span className="sd-pill">Neapolitan Pizzas</span>
+          <span className="sd-pill">Small Plates &amp; Fresh Greens</span>
+          <span className="sd-pill">Non-Alcoholic Refreshments</span>
+        </div>
+        <p className="sd-empty sd-center">The sections and items below are edited in “Menu Sections” and “Menu Items”.</p>
+      </section>
+    </Frame>
+  );
+};
+
+/** content/menu-sections/*.json — a section heading as it appears above its items. */
+export const MenuSectionPreview = (props: CustomPreviewTemplateProps) => {
+  const d = data(props);
+  const title = text(d.title);
+  return (
+    <Frame section="Our Daily Menu — section heading">
+      <section className="sd-section">
+        <MenuHeading />
+        <div className="sd-pills">
+          <span className="sd-pill">Full Menu</span>
+          <span className="sd-pill sd-pill-active">{title.split('(')[0].trim() || 'Section'}</span>
+        </div>
+        <div className="sd-category">
+          <div className="sd-category-head">
+            <h3 className="sd-h3">{title || <em className="sd-empty">Section title</em>}</h3>
+            {text(d.subtitle) && <p className="sd-category-sub">{text(d.subtitle)}</p>}
           </div>
-        ))}
+          <div className="sd-grid">
+            <div className="sd-card sd-card-ghost">Items that have this section selected appear here (position {text(d.order) || '—'} on the menu).</div>
+          </div>
+        </div>
+      </section>
+    </Frame>
+  );
+};
+
+/** content/menu-items/*.json — the item card under its section heading. */
+export const MenuItemPreview = (props: CustomPreviewTemplateProps) => {
+  const d = data(props);
+  const hidden = d.visible === false;
+  return (
+    <Frame section="Our Daily Menu — item">
+      {hidden && <div className="sd-ribbon">“Show on menu” is off — this item is not shown on the website.</div>}
+      <section className="sd-section">
+        <div className="sd-category">
+          <div className="sd-category-head">
+            <h3 className="sd-h3">{text(d.section) || <em className="sd-empty">Choose a menu section</em>}</h3>
+          </div>
+          <div className="sd-grid">
+            <ItemCard item={d} highlight />
+            <div className="sd-card sd-card-ghost">Other items of this section · this one is at position {text(d.order) || '—'}</div>
+          </div>
+        </div>
       </section>
     </Frame>
   );

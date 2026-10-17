@@ -59,7 +59,8 @@
   <div class="what">
     <b>What you can change yourself</b>
     <ul>
-      <li><b>Daily Menu</b> — sections, items, descriptions, prices, dietary badges</li>
+      <li><b>Menu Items</b> — every dish and drink: description, price, badges, position, on/off the menu</li>
+      <li><b>Menu Sections</b> — the headings the menu is grouped under</li>
       <li><b>Blog Posts</b> — write, edit or hide essays in “The Baker’s Journal”</li>
       <li><b>Dough Announcement</b> — the dark strip at the top of every page</li>
       <li><b>Opening Hours</b> — times and notes for each day</li>
@@ -69,8 +70,8 @@
     <b>How publishing works</b>
     <ul>
       <li>You edit and click <b>Save</b>, then <b>Send for Review</b>.</li>
-      <li>Your change is packaged as a <i>pull request</i> on GitHub — the live site is <b>not</b> changed yet.</li>
-      <li>A reviewer approves it; the website updates itself about 2–3 minutes later.</li>
+      <li>Each item you save becomes its own <i>pull request</i> on GitHub (a “Draft” one until you send it) — the live site is <b>not</b> changed yet.</li>
+      <li>A reviewer approves it; the website updates itself about 2–3 minutes later and the card leaves the board.</li>
       <li>Nothing you do in the editor can break the live site — every change is checked and reviewed first.</li>
     </ul>
   </div>
@@ -87,15 +88,15 @@
   </div>
   <div class="step">
     <h2><span class="num">3</span> Make your change</h2>
-    <p>Menu sections and items are folded up — click <b>Expand All</b> or the small arrow on a row. Change the text or price, drag the <b>=</b> handle to reorder, use <b>+ Add Item</b> / <b>×</b> to add or remove. The right-hand <b>Preview</b> shows that part of the website exactly as it will look, and follows your typing.</p>
+    <p>Change the text, price or badges (green counters show the room left); pick the <b>Menu section</b>; set <b>Position in section</b> (lowest number first — 10, 20, 30 leaves room to slot a dish in). Switch <b>Show on menu</b> off for a sold-out dish instead of deleting it. <b>New</b> adds a dish. The <b>Preview</b> on the right shows the item as it will look on the website.</p>
     <img src="../images/guide/menu-edit.png" alt="Menu editor with a price being edited" style="width:100%;">
-    <div class="tip">Green counters such as <b>24 / 80</b> show how much room is left in a field. Badges (Vegetarian, Spicy…) are chosen from a list.</div>
+
   </div>
  </div>
  <div class="col">
   <div class="step">
     <h2><span class="num">2</span> Pick what you want to change</h2>
-    <p>On the left, choose <b>Blog Posts</b> or <b>Site Content</b>. Site Content holds the <b>Daily Menu</b>, <b>Dough Announcement</b> and <b>Opening Hours</b> — click one to open it.</p>
+    <p>The editor opens on <b>Menu Items</b>, grouped by section — click a dish to change it. <b>Menu Sections</b> holds the headings, <b>Blog Posts</b> the essays, and <b>Site Content</b> the menu introduction, <b>Dough Announcement</b> and <b>Opening Hours</b>.</p>
     <img src="../images/guide/site-content.png" alt="Site Content list">
   </div>
 
@@ -103,15 +104,15 @@
     <h2><span class="num">4</span> Save, then Send for Review</h2>
     <p>Click <b>Save</b> (top right). The editor confirms that your change was saved as a draft and asks whether to send it for review — click <b>Send for Review</b>.</p>
     <img src="../images/guide/send-for-review.png" alt="Send for Review dialog">
-    <p style="margin-top:2mm">The item now shows <span class="pill">In Review</span>. Choose <b>Later</b> only if you want to keep editing before anyone looks at it; the change then waits as a <span class="pill">Draft</span> until you send it.</p>
-    <img src="../images/guide/in-review.png" alt="Daily Menu marked In Review">
+    <p style="margin-top:2mm">The item now shows <span class="pill">In Review</span>. Choose <b>Later</b> only if you want to keep editing before anyone looks at it; the change then waits as a <span class="pill">Draft</span> — saved and safe, but nobody is asked to review it — until you send it.</p>
+
   </div>
 
   <div class="step">
     <h2><span class="num">5</span> Wait for approval — then it’s live</h2>
-    <p>The reviewer (site owner / developer) gets your change as a GitHub pull request, reads exactly what changed, and approves it. The website rebuilds itself and your update appears a few minutes later — no further action needed from you.</p>
-    <p>Follow progress on the <b>Editorial Workflow</b> board (branch icon at the top of the editor): <b>Drafts → In Review</b>. Once approved and merged, the card disappears and the change is on the site.</p>
-    <img src="../images/guide/workflow-board.png" alt="Editorial workflow board" style="width:70%; margin-left:auto; margin-right:auto;">
+    <p>The reviewer gets your change as a GitHub pull request, reads exactly what changed and approves it. The website rebuilds itself and your update appears a few minutes later — nothing more to do.</p>
+    <p>Follow progress on the <b>Editorial Workflow</b> board (branch icon, top of the editor): each card names the change, e.g. <i>Neapolitan Pizzas › Margherita — $21</i>. Use <b>Drafts</b> and <b>In Review</b> only; once merged, the card disappears and the change is live.</p>
+
   </div>
  </div>
 </div>
@@ -166,7 +167,7 @@
 
 <div class="footer">
   <span><b>Good to know:</b> sign out (top-right menu) on a shared computer; never share your access token.</span>
-  <span style="white-space:nowrap">Quick guide v1.2 · Questions? Contact the site developer.</span>
+  <span style="white-space:nowrap">Quick guide v1.3 · Questions? Contact the site developer.</span>
 </div>
 
 </body>

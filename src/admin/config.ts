@@ -9,6 +9,12 @@
  *
  * Field names MUST match the shapes in src/types.ts and the files under /content.
  *
+ * Menu content model (v1.3): one JSON file per menu item (content/menu-items/) and per menu
+ * section (content/menu-sections/), plus content/menu.json for the introduction. Item-level
+ * entries give every change its own pull request and let the Editorial Workflow card show
+ * "Section › Item — $price" (a card can only show an entry's title), which the single
+ * menu.json of v1.0–1.2 could not do.
+ *
  * Two operating modes, no code change required:
  *   • Production (GitHub Pages): "Sign in with GitHub" → OAuth through the Sveltia CMS
  *     Authenticator (see `backend.base_url`). Every save creates a branch + pull request
@@ -136,6 +142,187 @@ export const config: CmsConfig = {
   output: { omit_empty_optional_fields: false, json: { indent_style: 'space', indent_size: 2 } },
 
   collections: [
+    // -----------------------------------------------------------------------
+    // Menu items — one JSON file per dish/drink under content/menu-items/
+    // -----------------------------------------------------------------------
+    {
+      name: 'menu-items',
+      label: 'Menu Items',
+      label_singular: 'Menu Item',
+      icon: 'local_pizza',
+      description:
+        'Every dish and drink on the Daily Menu. Each item is its own entry, so a change shows up on the review board and on GitHub as “Section › Item”.',
+      folder: 'content/menu-items',
+      extension: 'json',
+      format: 'json',
+      create: true,
+      delete: true,
+      duplicate: true,
+      publish: false,
+      // The Editorial Workflow card and GitHub PR list show the entry's identifier. A computed
+      // "label" field (Section › Name — $price) is therefore the identifier; the slug still comes
+      // from the name so file names stay stable when a price or section changes.
+      identifier_field: 'label',
+      slug: {
+        template: '{{name}}',
+        editable: ['create'],
+        hint: 'Used for the file name — lowercase letters, numbers and dashes only.',
+        pattern: ['^[a-z0-9]+(?:-[a-z0-9]+)*$', 'Use lowercase letters, numbers and dashes only.'],
+      },
+      // Shown in the entry list AND on the Editorial Workflow cards.
+      summary: '{{fields.section}} › {{fields.name}} — ${{fields.price}}',
+      sortable_fields: { fields: ['order', 'name', 'price', 'section'], default: { field: 'order', direction: 'ascending' } },
+      view_groups: { groups: [{ name: 'section', label: 'Section', field: 'section' }], default: 'section' },
+      thumbnail: false,
+      editor: { preview: true },
+      fields: [
+        {
+          name: 'name',
+          label: 'Name',
+          widget: 'string',
+          required: true,
+          minlength: 2,
+          maxlength: 80,
+          pattern: SAFE_TEXT,
+        },
+        {
+          name: 'label',
+          label: 'Review label (filled in automatically)',
+          widget: 'compute',
+          value: '{{fields.section | truncate(28)}} › {{fields.name}} — ${{fields.price}}',
+          required: false,
+          hint: 'What reviewers see on the workflow board and on GitHub.',
+        },
+        {
+          name: 'section',
+          label: 'Menu section',
+          widget: 'relation',
+          collection: 'menu-sections',
+          value_field: 'title',
+          display_fields: ['title'],
+          search_fields: ['title'],
+          required: true,
+          hint: 'Which part of the menu the item belongs to. Sections are managed in “Menu Sections”.',
+        },
+        {
+          name: 'italianName',
+          label: 'Italian name',
+          widget: 'string',
+          required: false,
+          maxlength: 80,
+          pattern: SAFE_TEXT,
+        },
+        {
+          name: 'description',
+          label: 'Description',
+          widget: 'text',
+          required: true,
+          maxlength: 300,
+          pattern: SAFE_TEXT,
+        },
+        {
+          name: 'price',
+          label: 'Price (USD)',
+          widget: 'number',
+          value_type: 'float',
+          min: 0,
+          max: 500,
+          step: 0.5,
+          required: true,
+          before_input: '$',
+        },
+        {
+          name: 'tags',
+          label: 'Badges',
+          widget: 'select',
+          multiple: true,
+          required: false,
+          options: MENU_TAGS,
+          dropdown_threshold: 0,
+          hint: 'Dietary and highlight badges shown under the item.',
+        },
+        {
+          name: 'order',
+          label: 'Position in section',
+          widget: 'number',
+          value_type: 'int',
+          min: 1,
+          max: 999,
+          default: 50,
+          required: true,
+          hint: 'Items are listed from the lowest number to the highest (10, 20, 30 … leaves room to insert).',
+        },
+        {
+          name: 'visible',
+          label: 'Show on menu',
+          widget: 'boolean',
+          default: true,
+          required: false,
+          hint: 'Switch off to take an item off the menu (sold out, seasonal) without deleting it.',
+        },
+      ],
+    },
+
+    // -----------------------------------------------------------------------
+    // Menu sections — one JSON file per section under content/menu-sections/
+    // -----------------------------------------------------------------------
+    {
+      name: 'menu-sections',
+      label: 'Menu Sections',
+      label_singular: 'Menu Section',
+      icon: 'format_list_bulleted',
+      description: 'The headings the menu is grouped under (e.g. Neapolitan Pizzas). Items pick their section from this list.',
+      folder: 'content/menu-sections',
+      extension: 'json',
+      format: 'json',
+      create: true,
+      delete: true,
+      duplicate: false,
+      publish: false,
+      identifier_field: 'title',
+      slug: {
+        template: '{{title}}',
+        editable: ['create'],
+        hint: 'Used for the file name — lowercase letters, numbers and dashes only.',
+        pattern: ['^[a-z0-9]+(?:-[a-z0-9]+)*$', 'Use lowercase letters, numbers and dashes only.'],
+      },
+      summary: '{{fields.order}} · {{fields.title}}',
+      sortable_fields: { fields: ['order', 'title'], default: { field: 'order', direction: 'ascending' } },
+      thumbnail: false,
+      editor: { preview: true },
+      fields: [
+        {
+          name: 'title',
+          label: 'Section title',
+          widget: 'string',
+          required: true,
+          minlength: 2,
+          maxlength: 80,
+          pattern: SAFE_TEXT,
+          hint: 'Text in parentheses is hidden from the filter buttons, e.g. “Neapolitan Pizzas (Pizze Napoletane)”. Renaming a section: update its items’ “Menu section” too.',
+        },
+        {
+          name: 'subtitle',
+          label: 'Section description',
+          widget: 'string',
+          required: false,
+          maxlength: 200,
+          pattern: SAFE_TEXT,
+        },
+        {
+          name: 'order',
+          label: 'Position on the menu',
+          widget: 'number',
+          value_type: 'int',
+          min: 1,
+          max: 999,
+          default: 50,
+          required: true,
+          hint: 'Sections are listed from the lowest number to the highest.',
+        },
+      ],
+    },
+
     // -----------------------------------------------------------------------
     // Blog posts — one Markdown file per essay under content/blog/
     // -----------------------------------------------------------------------
@@ -273,14 +460,14 @@ export const config: CmsConfig = {
       name: 'site',
       label: 'Site Content',
       icon: 'storefront',
-      description: 'Day-to-day updates: the daily menu, the dough announcement banner and opening hours.',
+      description: 'Single-page settings: the menu introduction, the dough announcement banner and opening hours.',
       publish: false,
       editor: { preview: true },
       files: [
-        // ---- Daily Menu -----------------------------------------------------
+        // ---- Daily Menu: introduction text (items & sections are their own collections) ----
         {
           name: 'menu',
-          label: 'Daily Menu',
+          label: 'Menu Introduction',
           icon: 'restaurant_menu',
           file: 'content/menu.json',
           format: 'json',
@@ -292,95 +479,7 @@ export const config: CmsConfig = {
               required: true,
               maxlength: 400,
               pattern: SAFE_TEXT,
-            },
-            {
-              name: 'categories',
-              label: 'Menu sections',
-              label_singular: 'Menu section',
-              widget: 'list',
-              required: true,
-              min: 1,
-              max: 8,
-              collapsed: 'auto',
-              summary: '{{fields.title}}',
-              fields: [
-                {
-                  name: 'title',
-                  label: 'Section title',
-                  widget: 'string',
-                  required: true,
-                  maxlength: 80,
-                  pattern: SAFE_TEXT,
-                  hint: 'Text in parentheses is hidden from the filter buttons, e.g. “Neapolitan Pizzas (Pizze Napoletane)”.',
-                },
-                {
-                  name: 'subtitle',
-                  label: 'Section description',
-                  widget: 'string',
-                  required: false,
-                  maxlength: 200,
-                  pattern: SAFE_TEXT,
-                },
-                {
-                  name: 'items',
-                  label: 'Items',
-                  label_singular: 'Item',
-                  widget: 'list',
-                  required: true,
-                  min: 1,
-                  max: 30,
-                  collapsed: 'auto',
-                  summary: '{{fields.name}} — ${{fields.price}}',
-                  fields: [
-                    {
-                      name: 'name',
-                      label: 'Name',
-                      widget: 'string',
-                      required: true,
-                      minlength: 2,
-                      maxlength: 80,
-                      pattern: SAFE_TEXT,
-                    },
-                    {
-                      name: 'italianName',
-                      label: 'Italian name',
-                      widget: 'string',
-                      required: false,
-                      maxlength: 80,
-                      pattern: SAFE_TEXT,
-                    },
-                    {
-                      name: 'description',
-                      label: 'Description',
-                      widget: 'text',
-                      required: true,
-                      maxlength: 300,
-                      pattern: SAFE_TEXT,
-                    },
-                    {
-                      name: 'price',
-                      label: 'Price (USD)',
-                      widget: 'number',
-                      value_type: 'float',
-                      min: 0,
-                      max: 500,
-                      step: 0.5,
-                      required: true,
-                      before_input: '$',
-                    },
-                    {
-                      name: 'tags',
-                      label: 'Badges',
-                      widget: 'select',
-                      multiple: true,
-                      required: false,
-                      options: MENU_TAGS,
-                      dropdown_threshold: 0,
-                      hint: 'Dietary and highlight badges shown under the item.',
-                    },
-                  ],
-                },
-              ],
+              hint: 'Short paragraph under the “Our Daily Menu” heading. Menu items and sections are edited in their own lists.',
             },
           ],
         },

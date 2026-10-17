@@ -51,28 +51,66 @@ export const STORE_HOURS: StoreHours[] = hoursJson.days.map((d) => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Daily menu (content/menu.json)
+// Daily menu — intro (content/menu.json), sections (content/menu-sections/*.json)
+// and items (content/menu-items/*.json); one file per section/item so that every
+// change is its own pull request and workflow card.
 // ---------------------------------------------------------------------------
-const categoryIds = uniqueSlugs(menuJson.categories.map((c) => c.title));
+interface SectionFile {
+  title: string;
+  subtitle?: string;
+  order?: number;
+}
+
+interface ItemFile {
+  name: string;
+  italianName?: string;
+  description: string;
+  price: number;
+  tags?: string[];
+  /** Title of the section the item belongs to (relation by title). */
+  section: string;
+  order?: number;
+  visible?: boolean;
+}
+
+const sectionFiles = import.meta.glob<SectionFile>('../../content/menu-sections/*.json', { eager: true, import: 'default' });
+const itemFiles = import.meta.glob<ItemFile>('../../content/menu-items/*.json', { eager: true, import: 'default' });
+
+const byOrder = <T extends { order?: number }>(a: T, b: T) => (a.order ?? 50) - (b.order ?? 50);
+
+const sections = Object.values(sectionFiles).slice().sort(byOrder);
+const sectionIds = uniqueSlugs(sections.map((s) => s.title));
+
+const items = Object.values(itemFiles)
+  .filter((item) => item.visible !== false)
+  .slice()
+  .sort((a, b) => byOrder(a, b) || a.name.localeCompare(b.name));
+
+const itemIds = uniqueSlugs(items.map((item) => item.name));
+const itemIdOf = new Map(items.map((item, i) => [item, itemIds[i]]));
+
+const knownSections = new Set(sections.map((s) => s.title));
+items
+  .filter((item) => !knownSections.has(item.section))
+  .forEach((item) => console.warn(`[content] menu item “${item.name}” refers to unknown section “${item.section}” and is not shown`));
 
 export const MENU: Menu = {
   intro: menuJson.intro,
-  categories: menuJson.categories.map((category, i): MenuCategory => {
-    const itemIds = uniqueSlugs(category.items.map((item) => item.name));
-    return {
-      id: categoryIds[i],
-      title: category.title,
-      subtitle: category.subtitle,
-      items: category.items.map((item, j) => ({
-        id: itemIds[j],
+  categories: sections.map((section, i): MenuCategory => ({
+    id: sectionIds[i],
+    title: section.title,
+    subtitle: section.subtitle ?? '',
+    items: items
+      .filter((item) => item.section === section.title)
+      .map((item) => ({
+        id: itemIdOf.get(item)!,
         name: item.name,
         italianName: item.italianName || undefined,
         description: item.description,
         price: Number(item.price),
         tags: (item.tags ?? []).filter(Boolean),
       })),
-    };
-  }),
+  })),
 };
 
 export const MENU_CATEGORIES = MENU.categories;

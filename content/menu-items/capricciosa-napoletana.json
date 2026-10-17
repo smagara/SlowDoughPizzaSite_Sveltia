@@ -1,0 +1,13 @@
+{
+  "name": "Capricciosa Napoletana",
+  "label": "Neapolitan Pizzas (Pizze Nap… › Capricciosa Napoletana — $24",
+  "section": "Neapolitan Pizzas (Pizze Napoletane)",
+  "italianName": "Pizza Capricciosa Tradizionale",
+  "description": "San Marzano tomato base, fior di latte, artisanal prosciutto cotto (rosemary ham), wood-roasted cremini mushrooms, tender artichoke hearts, Gaeta black olives.",
+  "price": 24,
+  "tags": [
+    "Traditional"
+  ],
+  "order": 60,
+  "visible": true
+}

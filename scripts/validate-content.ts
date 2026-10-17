@@ -81,6 +81,13 @@ function validateField(file: string, path: string, field: Field, value: unknown)
       }
       break;
     }
+    case 'relation': {
+      if (typeof value !== 'string') return fail(file, `${path} must be a string`);
+      // Cross-file check: the referenced entry must exist in the target collection (by value_field)
+      const targets = relationValues(field.collection, field.value_field);
+      if (targets && !targets.has(value)) fail(file, `${path} refers to “${value}”, which is not an existing ${field.collection} entry`);
+      break;
+    }
     case 'select': {
       const allowed = (field.options as any[]).map((o) => (typeof o === 'object' ? o.value : o));
       const values = Array.isArray(value) ? value : [value];
@@ -127,6 +134,48 @@ function validateObject(file: string, path: string, fields: Field[], value: unkn
 const FRONT_MATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 let checked = 0;
 
+/** Parse one entry file of a folder collection into { data, body } or record a failure. */
+function readEntry(rel: string, format: string): { data: unknown; body?: string } | undefined {
+  const raw = readFileSync(abs(rel), 'utf8');
+  if (format === 'json') {
+    try {
+      return { data: JSON.parse(raw) };
+    } catch (e) {
+      fail(rel, `is not valid JSON (${(e as Error).message})`);
+      return undefined;
+    }
+  }
+  const m = raw.match(FRONT_MATTER);
+  if (!m) { fail(rel, 'missing YAML front matter (--- … ---)'); return undefined; }
+  try {
+    return { data: parseYaml(m[1], { schema: 'core' }) ?? {}, body: m[2].trim() };
+  } catch (e) {
+    fail(rel, `front matter is not valid YAML (${(e as Error).message})`);
+    return undefined;
+  }
+}
+
+/** Values a relation field may take: the `value_field` of every entry in the target collection. */
+const relationCache = new Map<string, Set<string> | undefined>();
+function relationValues(collectionName: string, valueField = '{{slug}}'): Set<string> | undefined {
+  const key = `${collectionName}:${valueField}`;
+  if (relationCache.has(key)) return relationCache.get(key);
+  const target = (config.collections ?? []).find((c) => !('divider' in c) && c.name === collectionName);
+  if (!target || !('folder' in target)) { relationCache.set(key, undefined); return undefined; }
+  const ext = `.${target.extension ?? 'md'}`;
+  const values = new Set<string>();
+  for (const name of readdirSync(join(root, target.folder))) {
+    if (!name.endsWith(ext)) continue;
+    const slug = basename(name, ext);
+    if (valueField === '{{slug}}') { values.add(slug); continue; }
+    const entry = readEntry(join(target.folder, name), target.format ?? 'yaml-frontmatter');
+    const v = (entry?.data as Record<string, unknown> | undefined)?.[valueField.replace(/^\{\{|\}\}$/g, '')];
+    if (typeof v === 'string') values.add(v);
+  }
+  relationCache.set(key, values);
+  return values;
+}
+
 for (const collection of config.collections ?? []) {
   if ('divider' in collection) continue;
 
@@ -162,23 +211,14 @@ for (const collection of config.collections ?? []) {
       const slug = basename(name, ext);
       if (slugPattern && !slugPattern.test(slug)) fail(rel, `file name “${slug}” is not a valid slug (lowercase letters, numbers, dashes)`);
 
-      const raw = readFileSync(abs(rel), 'utf8');
-      const m = raw.match(FRONT_MATTER);
-      if (!m) { fail(rel, 'missing YAML front matter (--- … ---)'); continue; }
-
-      let fm: unknown;
-      try {
-        fm = parseYaml(m[1], { schema: 'core' }) ?? {};
-      } catch (e) {
-        fail(rel, `front matter is not valid YAML (${(e as Error).message})`);
-        continue;
-      }
+      const entry = readEntry(rel, collection.format ?? 'yaml-frontmatter');
+      if (!entry) continue;
 
       const fields = collection.fields as Field[];
-      const bodyField = fields.find((f) => f.name === 'body');
-      const frontMatterFields = fields.filter((f) => f.name !== 'body');
-      validateObject(rel, '', frontMatterFields, fm);
-      if (bodyField) validateField(rel, 'body', bodyField, m[2].trim());
+      const bodyField = entry.body !== undefined ? fields.find((f) => f.name === 'body') : undefined;
+      const dataFields = bodyField ? fields.filter((f) => f.name !== 'body') : fields;
+      validateObject(rel, '', dataFields, entry.data);
+      if (bodyField) validateField(rel, 'body', bodyField, entry.body);
     }
   }
 }

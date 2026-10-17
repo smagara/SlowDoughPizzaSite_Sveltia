@@ -1,0 +1,13 @@
+{
+  "name": "Cold-Brewed Hibiscus and Blood Orange Tea",
+  "label": "Non-Alcoholic Refreshments › Cold-Brewed Hibiscus and Blood Orange Tea — $5",
+  "section": "Non-Alcoholic Refreshments",
+  "italianName": "Infuso a freddo di ibisco e arancia rossa",
+  "description": "Unsweetened slow cold-steeped wild hibiscus flowers, dried blood orange peel, and fresh mint sprig.",
+  "price": 5,
+  "tags": [
+    "House-Made"
+  ],
+  "order": 40,
+  "visible": true
+}

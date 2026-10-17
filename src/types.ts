@@ -21,6 +21,7 @@ export interface MenuCategory {
   items: MenuItem[];
 }
 
+/** Assembled at build time from content/menu.json + menu-sections/*.json + menu-items/*.json. */
 export interface Menu {
   intro: string;
   categories: MenuCategory[];

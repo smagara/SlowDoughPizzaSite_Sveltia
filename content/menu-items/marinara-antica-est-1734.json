@@ -1,0 +1,15 @@
+{
+  "name": "Marinara Antica (Est. 1734)",
+  "label": "Neapolitan Pizzas (Pizze Nap… › Marinara Antica (Est. 1734) — $16",
+  "section": "Neapolitan Pizzas (Pizze Napoletane)",
+  "italianName": "Pizza Marinara Tradizionale",
+  "description": "Slow-simmered San Marzano tomatoes, thinly shaved fresh garlic, wild Sicilian mountain oregano, sea salt, cold-pressed olive oil. No cheese.",
+  "price": 16,
+  "tags": [
+    "Ancient Classic",
+    "Vegan",
+    "Dairy-Free"
+  ],
+  "order": 20,
+  "visible": true
+}
