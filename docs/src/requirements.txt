@@ -1,0 +1,7 @@
+# Python packages for regenerating the documentation deliverables (see docs/src/README.md)
+#   pip install -r docs/src/requirements.txt
+#   python -m playwright install chromium      # once, for the PDF export
+Pillow>=10.1
+python-docx>=1.1
+graphviz>=0.20        # Python bindings; ALSO install the Graphviz "dot" binary (graphviz.org) for diagrams-graphviz.py
+playwright>=1.45

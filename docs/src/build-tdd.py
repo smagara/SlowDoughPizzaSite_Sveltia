@@ -105,9 +105,9 @@ TABLE(["Item", "Value"], [
     ["Repository", "https://github.com/smagara/SlowDoughPizzaSite_Sveltia"],
     ["Live site", "https://smagara.github.io/SlowDoughPizzaSite_Sveltia/"],
     ["Content editor", "https://smagara.github.io/SlowDoughPizzaSite_Sveltia/admin — unlisted URL, not linked from the site; works with or without a trailing slash"],
-    ["Document version", "1.5 — " + datetime.date.today().strftime("%d %B %Y") + " (see §16 Revision history)"],
-    ["Status", "Prototype — implemented and verified offline with an end-to-end test; production sign-in (OAuth helper) and branch protection require one-time owner setup (§12)"],
-    ["Audience", "Site owner, developers maintaining the site, reviewers of content pull requests"],
+    ["Document version", "1.6 — " + datetime.date.today().strftime("%d %B %Y") + " (see §16 Revision history)"],
+    ["Status", "In production. Verified offline with unit + end-to-end tests and in the owner's GitHub repository; the one-time repository settings are listed in §12.1. Open questions were answered by the dev team (§14)."],
+    ["Audience", "Site owner, developers maintaining the site, the manager who approves content in the editor"],
     ["Companion document", "Manager Quick Guide (docs/Manager-Quick-Guide.pdf) — 2-page instructions for the pizza manager"],
 ], widths=[4, 12.5])
 doc.add_page_break()
@@ -129,7 +129,7 @@ for s in [
     "Two operating modes: a local edit mode for development/testing and a production mode backed by GitHub.",
     "Access restricted to GitHub collaborators of the repository.",
     "Validation of free-text input (including script/HTML characters) in the editor, in CI and at render time.",
-    "A pull-request based publishing workflow on a feature branch, with review/approval on GitHub.",
+    "A pull-request based publishing workflow on a feature branch: every change is reviewed in the editor and recorded as a GitHub pull request; GitHub merges it automatically once the manager marks it Ready (v1.5).",
     "Automatic build and deployment to GitHub Pages when a pull request is merged to main.",
 ]: B(s)
 P("Out of scope: image/media management (no image fields are exposed yet), multilingual content, deploy previews per pull request, and analytics. These are listed in §14 where relevant.")
@@ -146,14 +146,14 @@ TABLE(["#", "Requirement (from the brief)", "Design element", "Verified by"], [
     ["R4", "Hidden link to a web form of the editable fields, styled appropriately for the site", "§5.4 — v1.0 used an unobtrusive ✎ footer link; per the owner's v1.2 request the site now contains no link at all and editors use the unlisted /admin/ URL. Editor skinned in the site palette; preview pane renders the real page sections (§5.5)", "e2e scenarios 1, 3, 6, 8 (no link/reference to /admin in the public page; preview templates rendered); screenshots B-1, B-5…B-12"],
     ["R5", "Only GitHub repository collaborators may access", "§6 — Sveltia checks `/repos/{owner}/{repo}/collaborators/{user}`; GitHub enforces write permission on every API call", "e2e scenario 2 (non-collaborator rejected)"],
     ["R6", "Reasonable validation of free text, incl. script characters", "§9 — five layers: form rules (regex/length/options), PR review, CI validator, safe rendering, CSP", "e2e scenario 4; `npm run validate:content` negative test"],
-    ["R7", "A successful update triggers a pull request on a feature branch (not main) for review/approval", "§7 — Editorial Workflow: branch `cms/<collection>/<slug>`, draft PR, “Send for Review”; editors cannot publish (`publish: false`)", "e2e scenarios 3, 5, 6 (branch, commit, PR, labels asserted)"],
-    ["R8", "Approval + merge to main automatically builds and deploys", "§8 — `.github/workflows/deploy.yml` on push to main → validate → build → deploy-pages", "Workflow file review; build verified locally (same commands)"],
+    ["R7", "A successful update triggers a pull request on a feature branch (not main) for review/approval", "§7 — Editorial Workflow: branch `cms/<collection>/<slug>`, draft PR, “Send for Review”, review in the editor, “Ready” = approval; the publish gate (§8.5) keeps the PR unmergeable until then. Approval on GitHub itself was replaced by approval in the editor at the owner's request (D20, §14)", "e2e scenarios 3, 5, 6 (branch, commit, PR, labels, single PR across lane moves); unit tests of the gate"],
+    ["R8", "Approval + merge to main automatically builds and deploys", "§8 — the gate squash-merges on Ready and dispatches `deploy.yml` (validate → build → deploy-pages); a manual merge triggers it through the push event", "Workflow file review; unit tests; build verified locally; post-deployment check (§12.1)"],
     ["R9", "Technical design document with flow diagram; manager PDF with screenshots", "This document (§7 flow diagram) and docs/Manager-Quick-Guide.pdf", "—"],
 ], widths=[0.9, 5.2, 6.2, 4.2], font=8.5)
 
 # ================================================================== 3
 H("3. Solution overview")
-P("Figure 1 (next page) shows the overall architecture. The site remains a fully static build. Editable content is stored as plain files in the repository; the React components import those files at build time. Sveltia CMS — a single-page application that runs entirely in the editor's browser — reads and writes the same files through the GitHub API on a dedicated branch and opens a pull request. GitHub Actions validates and builds every pull request and deploys main to GitHub Pages after a merge. No server-side code is required anywhere in the path; the only optional service is a tiny OAuth helper for the “Sign in with GitHub” button.")
+P("Figure 1 (next page) shows the overall architecture. The site remains a fully static build. Editable content is stored as plain files in the repository; the React components import those files at build time. Sveltia CMS — a single-page application that runs entirely in the editor's browser — reads and writes the same files through the GitHub API on a dedicated branch and opens a pull request. GitHub Actions validates and builds every pull request, keeps it unmergeable until the manager marks the entry Ready in the editor, then merges it and deploys main to GitHub Pages. No server-side code is required anywhere in the path; the only optional service is a tiny OAuth helper for the “Sign in with GitHub” button (not used: the owner chose token sign-in, §14).")
 landscape_figure(f"{IMG}/diagrams/architecture.png", "Figure 1 — System architecture: repository, build pipeline, runtime and local development mode.")
 H("3.1 Technology summary", 2)
 TABLE(["Concern", "Choice", "Notes"], [
@@ -234,7 +234,7 @@ H("6.3 Where the editor reads from — and the content-source check", 2)
 P("In GitHub mode the editor reads the repository's default branch on GitHub; in local mode it reads the working copy in the chosen folder. The two diverge whenever files exist locally but have not been pushed (or were pushed to another branch). Sveltia then shows the affected collections as empty without any error, which was mistaken for a CMS bug twice (v1.1: a stale main without content/; v1.4: the v1.3 menu folders present locally but not yet on main). Since v1.4 src/admin/content-check.ts runs after a GitHub sign-in: using the user's own token it asks which branch is being read and whether every configured folder and file exists there (GET /repos/{repo}/contents/{path}?ref=branch), and shows a dismissible banner naming the missing paths with the remedy (commit and push/merge to that branch, reload). It never blocks the editor and is silent when everything is present; the result is also logged to the console. The e2e test covers both outcomes (scenarios 3 and 10).")
 H("6.4 What a collaborator can and cannot do", 2)
 B("Can: read all files in the repository (it is public anyway), create and update branches named cms/…, open pull requests, change their labels and mark them ready for review.")
-B("Cannot from the editor: merge to main. The Publish control is disabled for every collection (`publish: false`), and branch protection on main (§12) requires a pull request with an approval and a green status check even for users with write access. Open Authoring (editing from forks) is off, so outsiders cannot even propose changes through the editor.")
+B("Cannot: write to main directly or merge a pull request by hand — branch protection (§12.1) requires a pull request with green status checks even for users with write access, and Sveltia's Publish control is disabled for every collection (`publish: false`). Merging is done by the publish gate once an entry is Ready (§8.5). Open Authoring (editing from forks) is off, so outsiders cannot even propose changes through the editor.")
 
 # ================================================================== 7
 H("7. Editorial workflow: from Save to pull request")
@@ -245,9 +245,11 @@ TABLE(["Step", "What happens", "Where"], [
     ["3–4", "Manager edits fields; the form validates required fields, lengths, option lists and the anti-markup regex rules. Save is blocked until errors are fixed.", "Browser"],
     ["5–6", "On Save, Sveltia creates (or reuses) branch cms/<collection>/<slug> from the head of main, commits the changed file(s) with the message `content: update <collection> “<slug>”` via the GraphQL createCommitOnBranch mutation, and opens a DRAFT pull request against main labelled sveltia-cms/draft. main is never written to.", "GitHub"],
     ["7–8", "Because editors cannot publish, Sveltia immediately asks “Send for Review”. Confirming replaces the label with sveltia-cms/pending_review and marks the pull request ready for review (no longer a draft). “Later” keeps it as a draft the manager can keep editing.", "Browser → GitHub"],
-    ["9", "The PR check workflow runs: content validation, type-check and a full build. Its result appears as a status check on the pull request.", "GitHub Actions"],
-    ["10–11", "The reviewer reads the diff (plain JSON / Markdown), approves and merges (squash merge recommended). Branch protection makes approval + green check mandatory.", "Reviewer on GitHub"],
-    ["12–13", "The push to main triggers the deploy workflow: validate → build with the Pages base path → publish. The site is typically live 2–3 minutes after the merge.", "GitHub Actions → Pages"],
+    ["8 (cont.)", "The publish gate reports the commit status sveltia/workflow = pending on the PR; because the branch rule requires that status, the pull request cannot be merged by anyone while the entry is a Draft or In Review.", "GitHub Actions → GitHub"],
+    ["9", "The PR check workflow runs: content validation, type-check, unit tests and a full build. Its result appears as a check on the pull request.", "GitHub Actions"],
+    ["10", "The manager opens the card from the editor's In Review lane, checks the site-styled preview and moves it to Ready (label sveltia-cms/pending_publish). Nothing is done on GitHub.", "Reviewer in the editor"],
+    ["11", "The gate re-evaluates: Ready + green PR check → status success → squash-merge of the pull request (commit title = PR title) → deploy workflow dispatched → explanatory comment on the PR. If the check failed, the status is failure and nothing is merged.", "GitHub Actions"],
+    ["12–13", "The deploy workflow validates, builds with the Pages base path and publishes. The site is typically live 2–3 minutes after the card was moved to Ready; the card leaves the board. No GitHub visit is needed at any step — GitHub is the audit trail (diff, checks, who set Ready).", "GitHub Actions → Pages"],
 ], widths=[1.3, 12, 3.2], font=9)
 H("7.1 Conventions", 2)
 TABLE(["Item", "Value"], [
@@ -255,18 +257,18 @@ TABLE(["Item", "Value"], [
     ["Branch name", "cms/<collection>/<slug>, e.g. cms/menu-items/margherita-verace-d-o-p, cms/blog/harvest-special-pumpkin-sage. One branch (and one PR) per entry; further saves of the same entry add commits to the same branch."],
     ["PR title / commit message", "content: add|update|remove <Collection label> “<slug>” (configured in `backend.commit_messages`)"],
     ["PR body", "“Automatically generated by Sveltia CMS”"],
-    ["Labels", "sveltia-cms/draft → sveltia-cms/pending_review (→ sveltia-cms/pending_publish is unused because publishing from the editor is disabled)"],
-    ["Draft state", "Draft PR while the status is Draft; ready for review after “Send for Review”"],
-    ["Merge", "Done by the reviewer on GitHub. `squash_merges: true` only affects the (disabled) in-editor publish action; enable “Automatically delete head branches” in the repository so merged cms/… branches disappear."],
-    ["Deleting an entry", "Deleting a blog post in the editor also goes through a pull request (label sveltia-cms/pending_deletion); nothing is removed from main without review."],
+    ["Labels", "sveltia-cms/draft → sveltia-cms/pending_review → sveltia-cms/pending_publish (Ready). The publish gate turns the last one into a merge."],
+    ["Draft state", "A genuine GitHub draft pull request while the card is in Drafts (Sveltia creates the PR with draft: true and later calls the markPullRequestReadyForReview / convertPullRequestToDraft GraphQL mutations); ready for review after “Send for Review”. GitHub itself refuses to merge a draft PR — this is not a label."],
+    ["Merge", "Done by the publish gate (squash, commit title = PR title). `squash_merges: true` only affects Sveltia's disabled in-editor publish action. Enable “Automatically delete head branches” so merged cms/… branches disappear."],
+    ["Deleting an entry", "Deleting an entry in the editor also goes through a pull request (label sveltia-cms/pending_deletion). The gate never merges deletions (D21); a developer merges them on GitHub — the owner accepted this (§14)."],
     ["Discarding", "The manager can discard an unpublished change from the Editorial Workflow board; Sveltia closes the PR and deletes the branch."],
 ], widths=[3.8, 12.7], font=9)
 H("7.2 Pull-request lifecycle versus the lanes", 2)
 P("Sveltia keeps no workflow state of its own: a card on the board *is* an open pull request and the lane *is* its label (sveltia-cms/draft → pending_review → pending_publish). The first Save therefore creates the branch and a GitHub draft pull request; lane moves relabel that same PR and toggle GitHub's draft flag; a merged PR leaves the board. The end-to-end test asserts that moving In Review → Draft → In Review leaves exactly one PR, and the owner's PR #3 timeline showed the same. A “Published” lane cannot exist as a column — publication is the website and GitHub's merged list.")
 P("Two gaps between the two systems were observed in production and closed in v1.5 (§8.5): GitHub considered an entry mergeable as soon as it left Drafts (“ready for review” is GitHub's only non-draft state), and publishing still required someone to approve and merge on GitHub. The CMS publish gate now ties GitHub's mergeability to the editor's lanes and performs the merge itself once an entry reaches Ready, so routine content changes never require a GitHub visit. Sveltia's own Publish button stays hidden (publish: false); the Ready lane is the publishing control.")
 P("Cosmetic note: when a card moves, GitHub's timeline shows “added sveltia-cms/draft, sveltia-cms/pending_review and removed sveltia-cms/draft” in one line. Sveltia replaces the whole label set in a single API call and GitHub renders the diff that way; no label is actually re-added.")
-H("7.3 What the reviewer sees", 2)
-P("The pull request's Files changed tab shows a line-level diff of a JSON or Markdown file (e.g. `\"price\": 19` → `\"price\": 21`, plus the recomputed label line). The PR check summary lists the changed files. Because the validator and the build run on the exact merge result, a green check means the site will build with that content. If the check is red, the job log names the file, field and rule that failed (e.g. “content/menu.json: categories[0].items[2].description is longer than 300 characters”).")
+H("7.3 What the manager and GitHub see", 2)
+P("The manager reviews in the editor: the card names the change (“Neapolitan Pizzas … › Margherita — $21”), and opening it shows every field next to the site-styled preview. GitHub keeps the audit trail: the pull request's Files changed tab shows a line-level diff of a JSON or Markdown file (e.g. `\"price\": 19` → `\"price\": 21`, plus the recomputed label line), the Checks tab the PR check and the gate, the timeline who applied which label and when. The PR check summary lists the changed files. Because the validator and the build run on the exact merge result, a green check means the site will build with that content. If the check is red, the job log names the file, field and rule that failed (e.g. “content/menu.json: categories[0].items[2].description is longer than 300 characters”).")
 
 # ================================================================== 8
 H("8. Build and deployment (CI/CD)")
@@ -301,6 +303,7 @@ TABLE(["Situation", "Status", "Effect"], [
     ["Ready, PR check passed", "success — “Approved in the content editor by <user> — publishing”", "Squash-merge (retrying briefly until branch protection sees the status), deploy workflow dispatched, explanatory comment on the PR"],
 ], widths=[5.2, 5.8, 5.5], font=9)
 P("Why dispatch the deploy workflow: pushes and merges performed with the workflow's own GITHUB_TOKEN do not trigger other workflows (a GitHub safeguard against loops), so the push-to-main trigger of deploy.yml would not fire after an automatic merge. workflow_dispatch is explicitly exempt from that rule, so the gate starts the deployment directly; a developer's manual merge still triggers it through the push event. No personal access token or GitHub App is needed.")
+P("How to confirm the gate is active on a pull request: the Checks tab lists “PR check / Validate & build (PR)” and “CMS publish / Sveltia workflow gate”, and the merge box shows the status “sveltia/workflow” with one of the descriptions above. If the status is absent, cms-publish.yml is not yet on main or the branch rule does not require it; if it is green but the PR stays open, the branch rule still requires approvals (the gate logs “Could not merge automatically …” in that case).")
 P("Prerequisites and trade-offs (decision D20): the branch rule for main must require both statuses — “Validate & build (PR)” and “sveltia/workflow” — and, for the no-GitHub flow, require 0 approvals: GitHub cannot count a label as an approval, and a required approval can only be given on GitHub by someone other than the author. The approval therefore moves into the editor: whoever moves a card to Ready publishes it. With a single manager that is acceptable (and identical to a site owner merging their own change); where separation of duties matters, CMS_REQUIRE_SECOND_REVIEWER=true enforces that the person who sets Ready is not the author of the draft, using GitHub's own audit trail. The gate never bypasses branch protection — if the rule still requires approvals, the merge call fails and the status explains why, leaving the PR for a developer.")
 
 # ================================================================== 9
@@ -322,7 +325,7 @@ P("Validation happens on Save; Sveltia shows the error under each field and a ba
 H("9.2 Layer 3 — CI validator (server-side re-validation)", 2)
 P("Browser-side validation can be bypassed by a determined user with write access (e.g. by committing a file by hand). scripts/validate-content.ts therefore walks the collections defined in src/admin/config.ts and re-applies the same rules to every file in content/: required fields, lengths, regex patterns, option lists, list sizes, number ranges, date format, unknown keys, file-name slugs and YAML front-matter syntax. In addition it scans every string for HTML tags, javascript: URLs, inline event handlers (on…=) and data:text/html URLs. It runs in the PR check and before every deploy, and fails the job with a precise message. Because the rules are read from the configuration there is one source of truth — adding a field to the editor automatically adds it to the validator.")
 H("9.3 Layer 2 — human review", 2)
-P("Every change is a pull request whose diff is small and readable. This is the only layer that can judge tone, typos and prices; the technical layers make sure the reviewer never has to look for hidden markup.")
+P("Every change waits in the editor's In Review lane until the manager has looked at it in the site-styled preview and moved it to Ready; the corresponding pull request is unmergeable until then (§8.5). This is the only layer that can judge tone, typos and prices; the technical layers make sure the reviewer never has to look for hidden markup. The pull request diff remains available on GitHub for audit or for a developer's second look.")
 H("9.4 Layer 4 — safe rendering", 2)
 B("React escapes every string it renders; no component uses dangerouslySetInnerHTML.")
 B("Blog bodies are rendered by src/components/Markdown.tsx (react-markdown). Raw HTML inside Markdown is dropped (`skipHtml`); only p, h2, h3, blockquote, strong, em, ul, ol, li, a and br are rendered (`allowedElements` + `unwrapDisallowed`); link URLs pass through react-markdown's default transform, which neutralises javascript: and other unsafe protocols; external links get rel=\"noopener noreferrer\".")
@@ -373,9 +376,10 @@ N("Choose the sign-in method. Token mode works immediately. For “Sign in with 
 N("Post-deployment checks: open the editor URL directly (it is not linked from the site), sign in as the manager, save a harmless change (e.g. the announcement), Send for Review, confirm on GitHub that the PR shows the pending “sveltia/workflow” status and cannot be merged, move the card to Ready in the editor, and confirm the gate merges it, the deploy workflow runs and the site updates — without touching GitHub.")
 H("12.2 Routine operations", 2)
 TABLE(["Task", "How"], [
-    ["Review a content change", "Open the pull request → Files changed → Approve → Squash and merge. The site redeploys automatically."],
-    ["Ask for a correction", "Request changes on the PR; the manager reopens the entry in the editor (it shows “In Review”), edits and saves again — the same PR is updated."],
-    ["Undo a published change", "Revert the merge commit on GitHub (Revert button on the merged PR) and merge the revert; or fix forward through the editor."],
+    ["Review and publish a content change (manager)", "Editorial Workflow board → open the card in In Review → check the preview → set the status to Ready. The gate merges and deploys; the card disappears when live."],
+    ["Ask for a correction (manager)", "Move the card back to Draft (or tell the editor); they edit and save again — the same pull request is updated, then send it for review again."],
+    ["Undo a published change", "Fix forward through the editor (fastest), or a developer reverts the merge commit on GitHub (Revert button on the merged PR) and merges the revert."],
+    ["Nothing happens after Ready", "Check Actions → “CMS publish” runs and the PR's Checks tab: the status sveltia/workflow explains the state (PR check failed, four-eyes rule, or the branch rule still requires approvals — set them to 0, §12.1). A developer can always merge manually once the status is green."],
     ["Add a new menu badge option", "Edit MENU_TAGS in src/admin/config.ts (and the badge colours in MenuSection.tsx if needed); deploy."],
     ["Add a new editable field", "Add the field to config.ts, the type in src/types.ts, the loader in src/content/index.ts and the component; the validator picks the rule up automatically."],
     ["Upgrade Sveltia CMS", "`npm update @sveltia/cms`, run `npm run check` and `npm run test:e2e`, deploy."],
@@ -395,7 +399,7 @@ TABLE(["Step", "Command / action", "Notes"], [
     ["3. Work and verify", "npm run check · npm run test:e2e", "check = type-check + content validator + unit tests + build. The e2e test writes screenshots to test-results/ (ignored); only UPDATE_SCREENSHOTS=1 touches docs/images/cms/. dist/ and node_modules/ are ignored."],
     ["4. Keep the tree clean", "git status before any pull/rebase", "git pull --rebase and git rebase refuse to run with unstaged or untracked-but-conflicting files. Commit to the branch, or git stash --include-untracked; git config rebase.autoStash true automates the stash. Never git add -A blindly — screenshots and other local artefacts stay out of commits."],
     ["5. Update the branch if main moved", "git fetch · git rebase origin/main  (or merge)", "Content PRs merged meanwhile only touch content/; conflicts are rare and confined to files both sides edited."],
-    ["6. Push and open a PR", "git push -u origin HEAD", "The PR check runs; the gate reports sveltia/workflow = success for code PRs, so the branch rule is satisfied as soon as the check is green. Merge on GitHub (squash)."],
+    ["6. Push and open a PR", "git push -u origin HEAD", "The PR check runs; the gate reports sveltia/workflow = success for code PRs, so the branch rule is satisfied as soon as the check is green. Code PRs are merged by a developer on GitHub (squash) — the gate only merges content PRs."],
     ["7. Content-model changes", "one PR with code + content + migrated files", "First publish or discard the open CMS pull requests (their branches carry the old structure), then merge the model change, then test GitHub mode — it reads the remote branch, so a folder that only exists locally shows as an empty collection (the editor's content-check banner says so)."],
     ["8. Regenerating documents", "python3 docs/src/build-tdd.py etc.", "Only when the documents are meant to change; the outputs are committed files."],
 ], widths=[3.6, 5, 7.9], font=8.5)
@@ -428,23 +432,27 @@ TABLE(["ID", "Decision", "Alternatives considered", "Rationale / consequences"],
 ], widths=[0.9, 4.6, 4.3, 6.7], font=8)
 
 # ================================================================== 14
-H("14. Open questions")
-for q in [
-    "**Who reviews?** The brief says the owner self-serves and changes need approval. If the owner is both editor and the only reviewer, GitHub cannot require an approval from someone else. Options: a second reviewer (developer), or allow the owner to bypass the rule while the manager's changes still require approval. Decision needed before enabling branch protection.",
-    "**OAuth helper hosting.** Cloudflare Workers is proposed. Does the owner have (or want) a Cloudflare account, or is token sign-in acceptable for the prototype?",
-    "**Preview of a pending change.** GitHub Pages has no per-PR previews. The reviewer sees a text diff (plus a green build). If a visual preview is needed, a follow-up could publish PR builds to a preview folder or another host and use Sveltia's deploy-preview link support.",
-    "**Images.** No image fields are exposed (the site uses inline SVG art). If photos are wanted, decide on a media folder under public/uploads (with size/type limits) or an external media library; the validator would need an asset check.",
-    "**More editable areas.** Hero copy, contact details, the “Batch Capacity” notice and the header hours badge are still hard-coded. They can be moved to content/ with the same pattern if routine updates are expected.",
-    "**Who may publish?** With the publish gate, moving a card to Ready publishes it. Decide whether every editor may do that or only the manager — GitHub cannot restrict who applies a label, so this is a staff instruction unless CMS_REQUIRE_SECOND_REVIEWER=true (author ≠ approver) is enough.",
-    "**Deletions.** Deleting an entry in the editor still ends in a pull request that a developer merges on GitHub (D21). If staff need to remove dishes themselves, use the item's “Show on menu” switch instead, or extend the gate to deletions.",
-    "**Renaming a menu section.** Items refer to their section by title (so diffs and cards stay human-readable). Renaming a section therefore needs the items re-pointed (the CI validator flags any item whose section no longer exists). If renames turn out to be frequent, switch the relation to the section slug and resolve titles in the loader.",
-    "**Group order in the Menu Items list.** Sveltia orders groups alphabetically, not by the sections' `order`; the website uses `order`. Prefixing section titles with numbers would align both at the cost of uglier headings.",
-    "**Menu badge vocabulary.** Badges are a fixed list (MENU_TAGS). Confirm the list, and whether the manager should be able to add new badges (free text) at the cost of looser validation.",
-    "**Date of blog posts.** Posts are listed by `date`; future-dated posts are shown immediately. Should scheduling (hide until date) be added?",
-    "**Token lifetime.** Fine-grained tokens expire (max 1 year). If token mode is used long-term, decide on a renewal reminder or move to OAuth.",
-    "**Notifications.** Who is notified when a PR is opened? GitHub's default notifications to the reviewer may be enough; otherwise configure a CODEOWNERS file (content/ → reviewer) so review requests are automatic.",
-    "**Browser support for local mode.** The local-repository mode needs Chrome/Edge. Confirm this is acceptable for the development team.",
-]: B(q)
+H("14. Open questions and their resolution")
+P("The questions raised during design were answered by the owner's dev team after the first production cycle. Decisions are recorded here; the configuration reflects them.")
+TABLE(["Question", "Decision (dev team)", "Consequence in the solution"], [
+    ["Who reviews?", "A single set of eyes reviews and approves changes for now.", "Branch rule with 0 required GitHub approvals; the manager's Ready in the editor is the approval (D20). CMS_REQUIRE_SECOND_REVIEWER stays off."],
+    ["OAuth helper hosting", "Token sign-in is sufficient; the owner requests a GitHub token and sets up a passkey on the pizza laptop.", "CMS_OAUTH_BASE_URL left unset → the editor offers token sign-in only (no broken OAuth button). The guide describes the one-time token paste."],
+    ["Preview of a pending change", "The editor's visual review is sufficient.", "No per-PR deploy previews; the site-styled preview templates (§5.5) are the review surface."],
+    ["Images", "Not required.", "No image fields; uploads disabled (§5.6)."],
+    ["More editable areas", "Current scope is sufficient.", "Hero copy, contact details etc. stay in code."],
+    ["Who may publish?", "Defaults; the manager coordinates who edits and asks Ops to add/remove GitHub logins.", "Any collaborator can technically set Ready; governance by staff instruction (guide: “Ready = manager only”). Collaborator list = access list."],
+    ["Deletions", "All edits flow through an approved PR.", "Deletion PRs are never auto-merged (D21); a developer merges them. Staff use “Show on menu / website” switches to hide content."],
+    ["Renaming a menu section", "Defaults; renames are rare and can be done as delete + add.", "Items keep referencing sections by title; the CI validator flags orphans."],
+    ["Group order in the Menu Items list", "Keep the current (alphabetical) group order.", "No change."],
+    ["Menu badge vocabulary", "Keep the fixed dictionary.", "MENU_TAGS in config.ts; a developer adds badges."],
+    ["Date of blog posts", "No scheduled posts.", "Posts show as soon as published; future dates are not held back."],
+    ["Token lifetime", "Yearly renewal; an administrative App proxy for the GitHub handshake may come later.", "Runbook entry for token renewal (§12.2). Replacing token sign-in with OAuth later needs only the worker + CMS_OAUTH_BASE_URL."],
+    ["Notifications", "Rely on GitHub's subscriptions.", "The gate comments on each PR when it publishes; GitHub notifications reach subscribed developers."],
+    ["Browser support for local mode", "Chrome is the recommended browser.", "Stated in the README and guide."],
+], widths=[3.4, 5.6, 7.5], font=8.5)
+P("Still open:")
+B("**Deletion requests** remain the one path that needs a developer on GitHub (D21). If that becomes a nuisance, the gate can be extended to merge pending_deletion PRs that were set by the manager.")
+B("**Token renewal reminder.** A yearly calendar entry is the current plan; a GitHub App (owner's “App proxy” idea) would remove the expiry altogether.")
 
 # ================================================================== 15
 H("15. Risks and mitigations")
@@ -456,13 +464,15 @@ TABLE(["Risk", "Impact", "Mitigation"], [
     ["Stale editor cache after a merge", "Manager sees old values", "Sveltia refreshes from main on load; reloading the editor fixes it; documented in the guide"],
     ["Two people edit the same file concurrently", "Second save hits a moved branch", "Sveltia detects the conflict and asks to reload/overwrite; one PR per entry keeps scope small"],
     ["Large Sveltia bundle (~17 MB of mostly lazy-loaded assets)", "Slower first load of the editor", "Assets are code-split and cached; public site is unaffected (separate entry)"],
-    ["Token leakage from the manager's browser", "Unauthorised commits/PRs as the manager", "Fine-grained, single-repo, expiring token; branch protection still requires review; revoke on GitHub"],
+    ["Token leakage from a staff browser", "Unauthorised entries could be saved and, if the holder also moves them to Ready, published", "Fine-grained, single-repo, expiring token; every change is a visible pull request with an audit trail; optional four-eyes rule (CMS_REQUIRE_SECOND_REVIEWER); revoke the token and remove the collaborator on GitHub"],
 ], widths=[5, 3.8, 7.7], font=9)
 
 # ================================================================== 16
 H("16. Revision history")
 TABLE(["Version", "Change", "Trigger"], [
     ["1.0", "Initial design and implementation.", "—"],
+    ["1.6.1", "Documentation tooling made cross-platform: Pillow diagram scripts look up fonts from a Linux/Windows/macOS candidate list with a built-in fallback (docs/src/diagram_common.py) and, like the Graphviz script, write to docs/images/diagrams from any working directory; new build-guide-pdf.py; docs/src/requirements.txt and rebuilt instructions.", "Dev team hit `OSError: cannot open resource` running diagram-content-update-flow.py on Windows (hard-coded DejaVu font path) and had to cd into the output folder first."],
+    ["1.6", "Documentation audit against the v1.5 behaviour: workflow table (§7, steps 8–13), conventions, reviewer wording, routine operations, risks and the validation-layers figure now describe review in the editor and automatic merge by the gate; open questions replaced by the dev team's decisions (§14); verification checklist for the gate (§8.5); explanation of GitHub draft pull requests versus labels (§7.1). No code changes.", "Owner review: step 13 questioned (a GitHub visit still seemed necessary — it is not once the v1.5 branch rule is in place); dev-team answers to the open questions; question how the Draft gate works."],
     ["1.5", "CMS publish gate (cms-publish.yml + scripts/cms-publish-gate.mjs, unit-tested): GitHub mergeability follows the editor's lanes via the required status sveltia/workflow; Ready + green check → squash-merge + deploy dispatch, optional four-eyes rule (§8.5, D20, D21). Editor URL works without trailing slash (§5.4, D22). Developer workflow procedure (§12.3); e2e screenshots no longer dirty the working tree. Site Content file identifiers renamed (dough-announcement, opening-hours, menu-introduction) so PR titles are self-explanatory.", "Owner requests: PRs showed as mergeable while only In Review; make Ready the publishing step and automate the merge so staff never visit GitHub; document the developer git workflow after a rebase mishap; allow the editor link without a trailing slash; clearer PR titles."],
     ["1.4", "Content-source check: after a GitHub sign-in the editor verifies every configured content folder/file exists on the branch it reads and shows a banner naming the missing ones (§6.3, D19). e2e scenario 10; README guidance on pushing content before testing GitHub mode.", "Owner report: all menu items missing in GitHub auth mode but present in local mode after updating to v1.3 — reproduced as “branch on GitHub does not yet contain content/menu-items and content/menu-sections” (the same GitHub code path loads all 13 items when the folders are present, as e2e scenario 3 shows)."],
     ["1.3", "Menu split into one entry per item and per section with a computed “Section › Item — $price” label that the workflow cards and PR list show (§4.3, §5.3, D17). Pull-request lifecycle analysed and documented; “Published lane” proposal declined with reasons (§7.2, D18); e2e test asserts that lane moves relabel a single PR. Route guard for stale #/collections/<unknown> URLs (§12). Sidebar minimum width; logo wordmark fitted with textLength.", "Owner feedback with screenshots: “Collection not found” after OAuth sign-in (URL …/#/collections/settings); workflow cards indistinguishable for menu edits; PRs present while entries are drafts; sidebar labels clipped; wordmark overlapping the logo border."],

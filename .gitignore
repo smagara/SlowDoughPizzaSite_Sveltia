@@ -152,3 +152,7 @@ test-results/
 
 # Screenshots shared for issue analysis (not part of the site)
 /*.png
+/TDDOpenQuestions.txt
+__pycache__/
+/diagrams-graphvis-error.txt
+/requirements.txt

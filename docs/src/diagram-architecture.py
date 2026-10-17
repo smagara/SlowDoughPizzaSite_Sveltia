@@ -1,9 +1,12 @@
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 import math
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from diagram_common import OUT_DIR, font  # noqa: E402  (cross-platform fonts, output folder)
 W, H = 2520, 1380
 img = Image.new("RGB", (W, H), "white"); d = ImageDraw.Draw(img)
-def font(size, bold=False):
-    return ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", size)
 F = font(23); FB = font(25, True); FS = font(20); FL = font(28, True); FT = font(36, True)
 INK="#24211e"; TERRA="#c85a32"; SAND="#f0e7dc"; CREAM="#faf8f5"; LINE="#8c8278"; GREEN="#335928"; GREENBG="#e9f0e6"; REDBG="#fbeee8"
 d.text((40, 40), "System architecture — repository, build pipeline and runtime", font=FT, fill=INK)
@@ -128,4 +131,4 @@ poly([(2440, 475), (2462, 475), (2462, 985), (2440, 985)], "read / write", at=(2
 poly([(2150, 1090), (2150, 1150)])
 poly([(1490, 1010), (1490, 1070)])
 d.text((1220, 1290), "PR approved & merged into main  →  deploy.yml runs  →  site updated", font=FS, fill=GREEN)
-img.save("architecture.png"); print("saved")
+img.save(OUT_DIR / "architecture.png"); print("saved", OUT_DIR / ("content-update-flow.png" if "flow" in __file__ else "architecture.png"))
