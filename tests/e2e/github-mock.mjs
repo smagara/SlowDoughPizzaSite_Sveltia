@@ -164,6 +164,16 @@ export class GitHubMock {
       return ok ? { status: 204 } : { status: 404, body: { message: 'Not Found' } };
     }
 
+    // Contents API (used by the editor's content-source check): 200 if the path exists on the ref
+    if ((x = m(new RegExp(`^${R}/contents/(.+)$`)))) {
+      const ref = params.get('ref') ?? this.defaultBranch;
+      const branch = this.branches.get(ref) ?? this.commits.get(ref);
+      const p = decodeURIComponent(x[1]).replace(/\/+$/, '');
+      const exists = branch && [...branch.files.keys()].some((f) => f === p || f.startsWith(`${p}/`));
+      if (!exists) return { status: 404, body: { message: 'Not Found' } };
+      return { status: 200, body: [...branch.files.keys()].filter((f) => f.startsWith(`${p}/`)).map((f) => ({ path: f, type: 'file' })) };
+    }
+
     if ((x = m(new RegExp(`^${R}/git/trees/([^/]+)$`)))) {
       const ref = decodeURIComponent(x[1]);
       const branch = this.branches.get(ref) ?? this.commits.get(ref); // branch name or commit SHA

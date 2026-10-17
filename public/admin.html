@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Slow Dough Pizza Co. — Content Editor</title>
+    <!--
+      Convenience redirect so the editor works with or without a trailing slash
+      (…/admin → …/admin/). The editor itself lives in admin/index.html.
+      Keeps the URL hash (#/collections/…) so bookmarks with a route still work.
+    -->
+    <meta http-equiv="refresh" content="0; url=admin/" />
+    <script>location.replace('admin/' + location.search + location.hash);</script>
+  </head>
+  <body>
+    <p>Opening the content editor… <a href="admin/">Continue</a></p>
+  </body>
+</html>

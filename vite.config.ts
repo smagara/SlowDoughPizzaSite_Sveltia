@@ -4,13 +4,14 @@ import path from 'node:path';
 import {defineConfig} from 'vite';
 import markdownContent from './tools/vite-plugin-markdown-content.ts';
 import contentSecurityPolicy from './tools/vite-plugin-csp.ts';
+import adminRedirect from './tools/vite-plugin-admin-redirect.ts';
 
 export default defineConfig(() => {
   return {
     // GitHub Pages serves the site from https://smagara.github.io/SlowDoughPizzaSite_Sveltia/
     // The deploy workflow sets BASE_PATH accordingly; local dev/preview serve from "/".
     base: process.env.BASE_PATH ?? '/',
-    plugins: [react(), tailwindcss(), markdownContent(), contentSecurityPolicy()],
+    plugins: [react(), tailwindcss(), markdownContent(), contentSecurityPolicy(), adminRedirect()],
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname, '.'),

@@ -1,0 +1,53 @@
+# Content-editor publishing gate (see scripts/cms-publish-gate.mjs for the full explanation).
+#
+# Aligns GitHub's "mergeable" state with Sveltia CMS's workflow lanes via the commit status
+# `sveltia/workflow` and publishes automatically once an entry is moved to "Ready":
+#
+#   Drafts / In Review / deletion  → status "pending"  (merge blocked while the status is required)
+#   Ready + PR check passed        → status "success", squash-merge, deploy workflow dispatched
+#   Ready + PR check failed        → status "failure"
+#   Dev PRs (no sveltia-cms label) → status "success" (never blocks code changes)
+#
+# Repository settings required (one-time):
+#   Settings → Branches → rule for `main` → "Require status checks to pass" with BOTH
+#     "Validate & build (PR)" and "sveltia/workflow"; required approvals: 0 for the no-GitHub flow
+#     (or keep 1 and merge manually — the gate then reports why it could not merge).
+#   Optional: Settings → Variables → CMS_REQUIRE_SECOND_REVIEWER = true  (four-eyes rule: the
+#     person who moves an entry to Ready must differ from the one who created the draft)
+name: CMS publish
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
+  workflow_run:
+    workflows: ["PR check"]
+    types: [completed]
+
+# One evaluation at a time per pull request / commit.
+concurrency:
+  group: cms-publish-${{ github.event.pull_request.number || github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write      # merge the pull request
+  pull-requests: write # comment on it
+  statuses: write      # report the sveltia/workflow status
+  checks: read         # read the PR check result
+  actions: write       # dispatch the deploy workflow after an automatic merge
+
+jobs:
+  gate:
+    name: Sveltia workflow gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }} # the gate script always comes from main
+
+      - uses: actions/github-script@v7
+        env:
+          REQUIRE_SECOND_REVIEWER: ${{ vars.CMS_REQUIRE_SECOND_REVIEWER }}
+        with:
+          script: |
+            const { run } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/cms-publish-gate.mjs`);
+            await run({ github, context, core, requireSecondReviewer: process.env.REQUIRE_SECOND_REVIEWER === 'true' });
