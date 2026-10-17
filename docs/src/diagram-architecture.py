@@ -82,9 +82,10 @@ box("tests", 620, 1150, "tests/e2e/  offline end-to-end test:\nsimulated GitHub 
 box("dist", 80, 940, "npm run build  →  dist/\nindex.html (site, meta CSP)  ·  admin/index.html (editor)  ·  assets/", w=1040, h=120)
 
 # actions
-box("prcheck", 1240, 190, "PR check\nvalidate:content · lint · build\n→ required status check", w=500, h=150, fill=GREENBG, outline=GREEN)
-box("deploy", 1240, 400, "Deploy to GitHub Pages\nvalidate → npm run build\n(BASE_PATH, OAuth URL) → deploy", w=500, h=150, fill=GREENBG, outline=GREEN)
-box("protect", 1240, 590, "Branch protection on main:\nPR + 1 approval + green PR check", w=500, h=80, small=True)
+box("prcheck", 1240, 185, "PR check (required status)\nvalidate:content · lint · unit · build", w=500, h=110, fill=GREENBG, outline=GREEN)
+box("gate", 1240, 320, "CMS publish gate (cms-publish.yml)\nlane label → status sveltia/workflow\nReady + green check → squash-merge\n+ dispatch deploy", w=500, h=150, fill=GREENBG, outline=GREEN)
+box("deploy", 1240, 495, "Deploy to GitHub Pages\nvalidate → build → deploy (push to\nmain or dispatched by the gate)", w=500, h=120, fill=GREENBG, outline=GREEN)
+box("protect", 1240, 632, "Branch rule on main: required statuses\n“Validate & build (PR)” + “sveltia/workflow”", w=500, h=56, small=True)
 
 # runtime
 box("pages", 1860, 190, "GitHub Pages (static)\nsmagara.github.io/\nSlowDoughPizzaSite_Sveltia/", w=580, h=150, fill=INK, outline=INK, fg="white")
@@ -113,10 +114,12 @@ poly([(1120, 280), (1142, 280), (1142, 780), (1120, 780)], "same rules", dashed=
 poly([(330, 870), (330, 940)], "vite build", at=(430, 905))
 poly([(870, 870), (870, 940)])
 # workflows → actions
-poly([(1120, 1215), (1180, 1215), (1180, 265), (1240, 265)], "pull_request", at=(1180, 240))
-poly([(1180, 475), (1240, 475)], "push to main", at=(1180, 450))
+poly([(1120, 1215), (1180, 1215), (1180, 240), (1240, 240)], "pull_request", at=(1180, 215))
+poly([(1180, 395), (1240, 395)], "labels / checks", at=(1180, 370))
+poly([(1180, 555), (1240, 555)], "push / dispatch", at=(1180, 530))
+poly([(1490, 295), (1490, 320)]); poly([(1490, 470), (1490, 495)])
 # deploy → pages
-poly([(1740, 475), (1800, 475), (1800, 265), (1860, 265)])
+poly([(1740, 555), (1800, 555), (1800, 265), (1860, 265)])
 # pages → visitor / manager
 poly([(1990, 340), (1990, 420)]); poly([(2310, 340), (2310, 420)])
 # manager → oauth (dashed), → ghapi

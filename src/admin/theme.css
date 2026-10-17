@@ -98,3 +98,26 @@ button[aria-label="Show Assets"],
     min-width: 220px;
   }
 }
+
+/* Content-source check banner (src/admin/content-check.ts) */
+#sd-content-check {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483000;
+  padding: 12px 44px 12px 16px;
+  border: 1px solid #e3c27a;
+  border-left: 4px solid #c85a32;
+  border-radius: 10px;
+  background: #fff3d6;
+  color: #4a3a1e;
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  box-shadow: 0 8px 24px rgba(36, 33, 30, 0.18);
+}
+#sd-content-check code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; background: rgba(255, 255, 255, 0.6); padding: 0 4px; border-radius: 3px; }
+#sd-content-check button {
+  position: absolute; top: 8px; right: 8px; width: 28px; height: 28px;
+  border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 16px; cursor: pointer;
+}
+#sd-content-check button:hover { background: rgba(0, 0, 0, 0.08); }

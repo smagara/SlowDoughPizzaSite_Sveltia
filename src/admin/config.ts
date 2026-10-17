@@ -466,7 +466,7 @@ export const config: CmsConfig = {
       files: [
         // ---- Daily Menu: introduction text (items & sections are their own collections) ----
         {
-          name: 'menu',
+          name: 'menu-introduction', // file name = slug in branch names and PR titles
           label: 'Menu Introduction',
           icon: 'restaurant_menu',
           file: 'content/menu.json',
@@ -486,7 +486,7 @@ export const config: CmsConfig = {
 
         // ---- Dough announcement banner --------------------------------------
         {
-          name: 'announcement',
+          name: 'dough-announcement',
           label: 'Dough Announcement',
           icon: 'campaign',
           file: 'content/announcement.json',
@@ -523,7 +523,7 @@ export const config: CmsConfig = {
 
         // ---- Opening hours ----------------------------------------------------
         {
-          name: 'hours',
+          name: 'opening-hours',
           label: 'Opening Hours',
           icon: 'schedule',
           file: 'content/hours.json',

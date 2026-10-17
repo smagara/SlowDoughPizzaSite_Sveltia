@@ -18,10 +18,13 @@
  *      and uploads are rejected even on the direct /assets route.
  *   9. A stale URL naming a collection that no longer exists (#/collections/settings) opens the
  *      start page instead of "Collection not found".
+ *  10. When the GitHub branch lacks a configured content folder (e.g. content/menu-items not yet
+ *      pushed) the editor shows a content-check banner naming the folders; never otherwise.
  *
  * GitHub's API is simulated in-process (github-mock.mjs) and wired in via Playwright request
  * interception, so no network, tokens or real repository are needed. Screenshots are written to
- * docs/images/cms/ and reused by the Technical Design Document and the manager guide.
+ * test-results/screenshots/ (git-ignored); with UPDATE_SCREENSHOTS=1 they refresh docs/images/cms/,
+ * which the Technical Design Document and the manager guide reuse.
  *
  *   npm run test:e2e            (requires a Playwright Chromium: `npx playwright install chromium`)
  */
@@ -35,7 +38,9 @@ import { GitHubMock } from './github-mock.mjs';
 import { parseMarkdownFile } from '../../tools/vite-plugin-markdown-content.ts';
 
 const root = resolve(import.meta.dirname, '../..');
-const shotsDir = join(root, 'docs/images/cms');
+// Screenshots go to the git-ignored test-results/ folder so that running the test never dirties
+// the working tree. Set UPDATE_SCREENSHOTS=1 to refresh the committed documentation images.
+const shotsDir = process.env.UPDATE_SCREENSHOTS === '1' ? join(root, 'docs/images/cms') : join(root, 'test-results/screenshots');
 mkdirSync(shotsDir, { recursive: true });
 
 const OWNER = 'smagara';
@@ -282,6 +287,8 @@ try {
 
     // No media uploads: Assets navigation + toolbar button + "+" menu item are hidden
     assert.equal(await page.locator('button[aria-label="Assets"]:visible').count(), 0, 'Assets nav hidden');
+    // Branch is complete → no content-check banner
+    assert.equal(await page.locator('#sd-content-check').count(), 0, 'no content-check banner when all folders exist');
 
     // Workflow board: the card names the section, the item and the new price; no "Publish" control for editors
     await page.goto(`${baseUrl}/admin/#/workflow`);
@@ -389,7 +396,7 @@ ${parsed.body}`);
     const page = await openEditor(ctx, baseUrl);
     await signInWithToken(page);
     await page.getByText('Collections', { exact: true }).waitFor();
-    await page.goto(`${baseUrl}/admin/#/collections/site/entries/announcement`);
+    await page.goto(`${baseUrl}/admin/#/collections/site/entries/dough-announcement`);
     await page.getByText('Headline', { exact: true }).waitFor();
     const headline = page.getByLabel('Headline').locator('input').first();
     await headline.fill("Today's Dough: 96-Hour Extended Ferment");
@@ -400,7 +407,7 @@ ${parsed.body}`);
     await page.getByRole('button', { name: 'Save' }).click();
     await page.getByRole('button', { name: 'Send for Review' }).click();
     await until(() => mock.pulls[0]?.labels.includes('sveltia-cms/pending_review'), 'announcement PR sent for review');
-    const json = JSON.parse(mock.branches.get('cms/site/announcement').files.get('content/announcement.json'));
+    const json = JSON.parse(mock.branches.get('cms/site/dough-announcement').files.get('content/announcement.json'));
     assert.equal(json.headline, "Today's Dough: 96-Hour Extended Ferment");
 
     // Even the direct /assets route cannot upload anything (media library max_file_size: 0)
@@ -425,7 +432,7 @@ ${parsed.body}`);
     const page = await openEditor(ctx, baseUrl);
     await page.getByRole('button', { name: 'Work with Local Repository' }).click();
     await page.getByText('Collections', { exact: true }).waitFor();
-    await page.goto(`${baseUrl}/admin/#/collections/site/entries/hours`);
+    await page.goto(`${baseUrl}/admin/#/collections/site/entries/opening-hours`);
     await page.getByText('Weekly schedule', { exact: true }).waitFor();
     await expandAll(page);
     await page.waitForTimeout(300);
@@ -468,6 +475,7 @@ ${parsed.body}`);
       if (!pathname.startsWith(BASE)) return route.fulfill({ status: 404, body: 'not found' });
       let file = join(root, 'dist', pathname.slice(BASE.length));
       if (pathname.endsWith('/')) file = join(file, 'index.html');
+      else if (!extname(file) && existsSync(`${file}.html`)) file = `${file}.html`; // GitHub Pages serves /admin from admin.html
       if (!existsSync(file)) return route.fulfill({ status: 404, body: `not found: ${pathname}` });
       return route.fulfill({ status: 200, headers: { 'content-type': MIME[extname(file)] ?? 'application/octet-stream' }, body: readFileSync(file) });
     });
@@ -486,6 +494,11 @@ ${parsed.body}`);
     assert.ok(!(await page.content()).includes('/admin'), 'no reference to /admin in the rendered page');
     assert.ok(!readFileSync(join(root, 'dist/index.html'), 'utf8').includes('admin'), 'no reference to admin in dist/index.html');
     assert.ok(/noindex/.test(readFileSync(join(root, 'dist/admin/index.html'), 'utf8')), 'editor page is noindex');
+
+    // Editor URL without the trailing slash (as people type/bookmark it) lands on the editor, hash preserved
+    await page.goto(`${PAGES_ORIGIN}${BASE}admin#/workflow`, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: /Sign In with .*GitHub/ }).waitFor();
+    assert.equal(page.url(), `${PAGES_ORIGIN}${BASE}admin/#/workflow`, '/admin redirects to /admin/ keeping the route');
 
     // Editor at the production URL
     await page.goto(`${PAGES_ORIGIN}${BASE}admin/`, { waitUntil: 'networkidle' });
@@ -515,6 +528,26 @@ ${parsed.body}`);
     await page.waitForTimeout(600);
     assert.match(page.url(), /#\/collections\/menu-items$/);
     assert.equal(await page.getByText('Collection not found').count(), 0);
+    await ctx.close();
+  });
+  // ------------------------------------------------------------------ 10. content-source check
+  await test('a GitHub branch without the menu folders shows 0 entries AND a content-check banner naming them', async () => {
+    // "main" as it was before v1.3: blog posts + the three single-file JSONs, no menu-items/ or menu-sections/
+    const mock = new GitHubMock({ owner: OWNER, repo: REPO, rootDir: root, include: ['content/blog', 'content/menu.json', 'content/announcement.json', 'content/hours.json'] });
+    const ctx = await githubContext(browser, mock);
+    const page = await openEditor(ctx, baseUrl);
+    await signInWithToken(page);
+    await page.getByText('Collections', { exact: true }).waitFor();
+    const banner = page.locator('#sd-content-check');
+    await banner.waitFor({ timeout: 20000 });
+    const text = (await banner.innerText()).replace(/\s+/g, ' ');
+    assert.match(text, /branch main does not contain/);
+    assert.match(text, /content\/menu-items \(Menu Items\)/);
+    assert.match(text, /content\/menu-sections \(Menu Sections\)/);
+    assert.doesNotMatch(text, /content\/blog/, 'existing folders are not reported');
+    await shot(page, '18-content-check-banner');
+    await banner.getByRole('button', { name: 'Dismiss' }).click();
+    assert.equal(await banner.count(), 0, 'banner can be dismissed');
     await ctx.close();
   });
 } finally {

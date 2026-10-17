@@ -43,6 +43,9 @@ jobs:
       - name: Type-check (includes the CMS configuration)
         run: npm run lint
 
+      - name: Unit tests (publishing gate)
+        run: npm run test:unit
+
       - name: Build site + content editor
         run: npm run build
         env:

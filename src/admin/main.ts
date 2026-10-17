@@ -6,6 +6,7 @@
  */
 import CMS from '@sveltia/cms';
 import { config } from './config';
+import { checkContentSource } from './content-check';
 import './theme.css';
 import previewStyles from './preview/preview.css?raw';
 import {
@@ -34,14 +35,16 @@ if (routeMatch && !knownCollections.has(decodeURIComponent(routeMatch[1]))) {
 CMS.registerPreviewStyle(previewStyles, { raw: true });
 CMS.registerPreviewTemplate('menu-items', MenuItemPreview); // Menu Items (collection name)
 CMS.registerPreviewTemplate('menu-sections', MenuSectionPreview); // Menu Sections (collection name)
-CMS.registerPreviewTemplate('menu', MenuIntroPreview); // Site Content → Menu Introduction (file name)
-CMS.registerPreviewTemplate('announcement', AnnouncementPreview); // Site Content → Dough Announcement
-CMS.registerPreviewTemplate('hours', HoursPreview); // Site Content → Opening Hours
+CMS.registerPreviewTemplate('menu-introduction', MenuIntroPreview); // Site Content → Menu Introduction (file name)
+CMS.registerPreviewTemplate('dough-announcement', AnnouncementPreview); // Site Content → Dough Announcement
+CMS.registerPreviewTemplate('opening-hours', HoursPreview); // Site Content → Opening Hours
 CMS.registerPreviewTemplate('blog', BlogPreview); // Blog Posts (collection name)
 
 CMS.init({ config })
   .then(() => {
     document.getElementById('sd-splash')?.remove();
+    // GitHub mode only: warn when the branch being read lacks a configured content folder/file.
+    void checkContentSource(config);
   })
   .catch((error: unknown) => {
     console.error('Sveltia CMS failed to start', error);

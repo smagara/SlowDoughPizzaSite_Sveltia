@@ -1,7 +1,7 @@
 from PIL import Image, ImageDraw, ImageFont
 import math
 
-W, H = 2520, 1500
+W, H = 2880, 1500
 SCALE = 1
 img = Image.new("RGB", (W, H), "white")
 d = ImageDraw.Draw(img)
@@ -13,7 +13,7 @@ F = font(23); FB = font(26, True); FS = font(20); FL = font(28, True); FT = font
 INK="#24211e"; TERRA="#c85a32"; SAND="#f0e7dc"; CREAM="#faf8f5"; LINE="#8c8278"; GREEN="#335928"; GREENBG="#e9f0e6"; REDBG="#fbeee8"
 
 # lanes
-lanes = ["Pizza manager\n(browser, /admin/)", "GitHub\n(repository & API)", "GitHub Actions\n(CI / CD)", "Reviewer\n(owner / developer)"]
+lanes = ["Editor (staff)\n(browser, /admin)", "GitHub\n(repository & API)", "GitHub Actions\n(CI / CD)", "Reviewer (manager)\n(in the editor)"]
 top, left = 120, 40
 lane_h = (H - top - 40) / len(lanes)
 label_w = 300
@@ -72,7 +72,7 @@ def arrow(a, b, label=None, dashed=False, color=LINE):
     acx, acy = (ax0 + ax1) / 2, (ay0 + ay1) / 2; bcx, bcy = (bx0 + bx1) / 2, (by0 + by1) / 2
     if abs(acy - bcy) < 5:                       # same lane: right edge → left edge
         p, q = (ax1, acy), (bx0, bcy); seg(p, q, dashed, color); head(p, q, color)
-        if label: put_label(label, (p[0] + q[0]) / 2, acy - 28)
+        if label: put_label(label, (p[0] + q[0]) / 2, min(ay0, by0) - 30)  # above both boxes, not inside the gap
         return
     down = bcy > acy
     if abs(acx - bcx) < 5:                       # same column: straight vertical
@@ -90,23 +90,24 @@ def arrow(a, b, label=None, dashed=False, color=LINE):
         if label: put_label(label, (start[0] + corner[0]) / 2, acy - 28)
 
 X = left + label_w + 50; G = 48; BW = 300
-xs = [X + i * (BW + G) for i in range(6)]
+xs = [X + i * (BW + G) for i in range(7)]
 # lane 0 (manager)
 box("open", 0, xs[0], "Open the editor URL\n(bookmark, not linked\nfrom the site) · sign in", num=1)
-box("edit", 0, xs[1], "Edit Daily Menu,\nBlog post, Announce-\nment or Opening Hours", num=3)
+box("edit", 0, xs[1], "Edit a menu item,\nsection, blog post,\nbanner or hours", num=3)
 box("val", 0, xs[2], "Form validation\nrequired · max length\nno < > or HTML tags", fill=REDBG, outline=TERRA, num=4)
 box("save", 0, xs[3], "Save\n(changes stay on a\nseparate branch)", num=5)
 box("send", 0, xs[4], "“Send for Review”", num=7)
+box("live", 0, xs[6], "Site updated ✓\nminutes after “Ready” —\nno GitHub visit needed", fill=INK, outline=INK, fg="white", num=13)
 # lane 1 (github)
 box("authz", 1, xs[0], "Collaborator check\n(only repo collaborators\nwith write access)", fill=REDBG, outline=TERRA, num=2)
 box("branch", 1, xs[3], "New branch\ncms/<collection>/<slug>\n+ commit + DRAFT\npull request → main", num=6, h=170)
-box("ready", 1, xs[4], "Pull request marked\nready for review, label\nsveltia-cms/pending_review", num=8, h=170)
+box("ready", 1, xs[4], "PR ready for review,\nlabel pending_review;\nstatus sveltia/workflow\n= pending (merge blocked)", num=8, h=170)
 # lane 2 (actions)
-box("prcheck", 2, xs[4], "PR check\nvalidate:content\nlint · build", fill=GREENBG, outline=GREEN, num=9)
-box("deploy", 2, xs[5], "Deploy workflow\nvalidate → build →\npublish to GitHub Pages", fill=GREENBG, outline=GREEN, num=12)
+box("prcheck", 2, xs[4], "PR check\nvalidate:content · lint\nunit tests · build", fill=GREENBG, outline=GREEN, num=9)
+box("gate", 2, xs[5], "CMS publish gate\nReady + green check →\nstatus success, squash-\nmerge, dispatch deploy", fill=GREENBG, outline=GREEN, num=11, h=170)
+box("deploy", 2, xs[6], "Deploy workflow\nvalidate → build →\npublish to GitHub Pages", fill=GREENBG, outline=GREEN, num=12)
 # lane 3 (reviewer)
-box("review", 3, xs[4], "Review the diff on\nGitHub (+ green check)\nApprove", num=10)
-box("merge", 3, xs[5], "Squash & merge\ninto main", num=11)
+box("review", 3, xs[5], "Open the card, check\nthe preview, move it\nto “Ready” (label\npending_publish)", num=10, h=170)
 
 arrow("open", "authz")
 arrow("authz", "edit", label="granted")
@@ -115,14 +116,16 @@ arrow("save", "branch")
 arrow("save", "send", label="then prompt", dashed=True)
 arrow("send", "ready")
 arrow("ready", "prcheck", label="pull_request")
-arrow("prcheck", "review", label="✓ status")
-arrow("review", "merge")
-arrow("merge", "deploy", label="push to main")
+arrow("prcheck", "gate", label="check result")
+arrow("review", "gate", label="labeled Ready")
+arrow("gate", "deploy", label="workflow_dispatch")
+arrow("deploy", "live")
 # errors loop label
 ex0, ey0, ex1, ey1 = boxes["val"]
 d.text((ex0 + 20, ey0 - 40), "errors → fix and retry", font=FS, fill=TERRA)
-box("live", 0, xs[5], "Site updated ✓\n(usually within\n2–3 minutes)", fill=INK, outline=INK, fg="white", num=13)
-arrow("deploy", "live")
+# reviewer sees the card in the editor's In Review lane
+rx0, ry0, rx1, ry1 = boxes["review"]
+d.text((rx0 - 300, ry0 + 60), "card appears in the\neditor’s “In Review” lane", font=FS, fill=LINE)
 
 img.save("content-update-flow.png")
 print("saved")

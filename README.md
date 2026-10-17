@@ -9,22 +9,28 @@ code. Every change becomes a **pull request** that is reviewed and merged on Git
 | | |
 |---|---|
 | Live site | https://smagara.github.io/SlowDoughPizzaSite_Sveltia/ |
-| Content editor | https://smagara.github.io/SlowDoughPizzaSite_Sveltia/admin/ — **not linked from the site**; editors bookmark it |
+| Content editor | https://smagara.github.io/SlowDoughPizzaSite_Sveltia/admin — **not linked from the site**; editors bookmark it (with or without a trailing slash) |
 | Technical design | [`docs/Technical-Design-Document.docx`](docs/Technical-Design-Document.docx) |
 | Manager guide | [`docs/Manager-Quick-Guide.pdf`](docs/Manager-Quick-Guide.pdf) |
 
 ## How it works
 
 ```
-Manager ──edits──▶ /admin/ (Sveltia CMS, runs in the browser; unlinked URL, noindex)
-                      │  GitHub API (signed-in collaborator only)
-                      ▼
-            branch cms/<collection>/<slug>  ──▶  Pull request → main   (draft → "In review")
-                                                      │  PR check: validate content + build
-                                            reviewer approves & merges
-                                                      ▼
-                                      GitHub Action: validate → build → deploy to Pages
+Staff ──edits──▶ /admin (Sveltia CMS, runs in the browser; unlinked URL, noindex)
+                    │  GitHub API (signed-in collaborator only)
+                    ▼
+          branch cms/<collection>/<slug> ──▶ pull request → main      Drafts → In Review → Ready
+                                                  │  PR check: validate content + build        (lanes in the editor)
+                                                  │  CMS publish gate: status sveltia/workflow
+                                                  │     pending while Draft / In Review (merge blocked)
+                                     manager moves the card to "Ready" in the editor
+                                                  ▼
+                              gate squash-merges the PR → deploy workflow → GitHub Pages
 ```
+
+Nobody has to open GitHub for a routine content change: the editor is the whole workflow, GitHub is
+the audit trail (every change is a pull request with a diff, a check run and who moved it to Ready).
+Developers still use ordinary pull requests for code; the gate waves those through.
 
 * **Editable content** lives in plain files under [`content/`](content/): one JSON file per menu
   item (`menu-items/`) and per menu section (`menu-sections/`), `menu.json` (introduction),
@@ -35,8 +41,10 @@ Manager ──edits──▶ /admin/ (Sveltia CMS, runs in the browser; unlinked
 * **CMS configuration** is TypeScript, type-checked against Sveltia's schema: [`src/admin/config.ts`](src/admin/config.ts).
   The same field rules (required, lengths, regex patterns, options) are re-applied server-side by
   [`scripts/validate-content.ts`](scripts/validate-content.ts) in CI.
-* **Workflows**: [`.github/workflows/pr-check.yml`](.github/workflows/pr-check.yml) (every PR) and
-  [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) (every push to `main`).
+* **Workflows**: [`pr-check.yml`](.github/workflows/pr-check.yml) (every PR),
+  [`cms-publish.yml`](.github/workflows/cms-publish.yml) (the publishing gate; logic in
+  [`scripts/cms-publish-gate.mjs`](scripts/cms-publish-gate.mjs), unit-tested) and
+  [`deploy.yml`](.github/workflows/deploy.yml) (push to `main` or dispatched by the gate).
 
 ### The editor URL is unlisted, not secret
 
@@ -55,9 +63,20 @@ advertise the path).
   removed from the UI (`src/admin/theme.css`) and uploads are rejected outright
   (`media_libraries.default.config.max_file_size: 0` in `src/admin/config.ts`), even on the direct
   `#/assets` route.
+* **Content-source check.** In GitHub mode the editor reads the repository's default branch *on
+  GitHub*, not your working copy — a folder that exists locally but has not been pushed shows up
+  as an empty collection. After sign-in the editor verifies that every configured content
+  folder/file exists on that branch and, if not, shows a banner naming them
+  (`src/admin/content-check.ts`). Local mode reads the working copy and is unaffected.
 * **Sign-in is remembered.** After a successful sign-in the editor opens directly on the next visit;
   the login page — and with it the **Work with Local Repository** option on localhost — reappears
   after *Sign Out* (account menu, top right).
+
+> **Updating a deployed site to a new version of this repo:** the editor's *GitHub* mode always
+> reads the remote default branch. After pulling a version that adds or moves content files
+> (v1.3 moved the menu into `content/menu-items/` and `content/menu-sections/`), push those files
+> to `main` before testing GitHub mode — until then the affected collections are empty there and
+> the editor's content-check banner tells you which folders are missing.
 
 ## Run locally
 
@@ -110,11 +129,13 @@ refreshes the screenshots in `docs/images/cms/`.
 2. **Editors** — add the manager as a **collaborator** with *Write* permission
    (*Settings → Collaborators*). Sveltia CMS only lets repository collaborators in; everyone
    else sees "You don't have access to the repository".
-3. **Protect `main`** — *Settings → Branches (or Rules) → add rule for `main`*:
-   require a pull request before merging, require **1 approval**, require the status check
-   **"Validate & build (PR)"**, block force pushes. This is what makes the review step mandatory.
-   Also enable *Settings → General → Pull Requests → Automatically delete head branches* so
-   merged `cms/…` branches are cleaned up.
+3. **Protect `main`** — *Settings → Branches (or Rules) → add rule for `main`*: require a pull
+   request before merging; require the status checks **"Validate & build (PR)"** *and*
+   **"sveltia/workflow"** (GitHub lists a status once it has been reported — open any PR first);
+   block force pushes. Required approvals: **0** for the no-GitHub flow (the editor's *Ready* lane
+   is the approval, optionally with `CMS_REQUIRE_SECOND_REVIEWER=true`); if you keep 1, the gate
+   cannot merge and a developer merges on GitHub once the status is green. Also enable
+   *Settings → General → Pull Requests → Automatically delete head branches*.
 4. **Sign-in method** — choose one (both can be enabled):
    * **Personal access token (no infrastructure).** Works immediately. The manager creates a
      fine-grained token for this repository with *Contents: Read and write* and
@@ -129,17 +150,28 @@ refreshes the screenshots in `docs/images/cms/`.
      `CMS_OAUTH_BASE_URL = https://<worker>.workers.dev` (*Settings → Secrets and variables →
      Actions → Variables*). The next deployment enables the button.
 
-## Reviewing a content change
+## Reviewing and publishing a content change
 
-1. The manager saves in the editor → a pull request titled e.g.
-   `content: update Menu Item “margherita-verace-d-o-p”` appears from branch
-   `cms/menu-items/margherita-verace-d-o-p`. It is a GitHub **draft** PR (label
-   `sveltia-cms/draft`) until the manager clicks **Send for Review**, which marks it *ready for
-   review* and relabels it `sveltia-cms/pending_review`.
-2. The **PR check** validates the content and builds the site. Open *Files changed* to see the
-   exact text diff.
-3. **Approve** and **Squash and merge**. The *Deploy to GitHub Pages* workflow publishes the
-   change within a couple of minutes; the card disappears from the editor's board.
+1. Staff save in the editor → a pull request such as `content: update Menu Item
+   “margherita-verace-d-o-p”` appears from branch `cms/menu-items/margherita-verace-d-o-p` as a
+   GitHub **draft** PR (label `sveltia-cms/draft`). **Send for Review** marks it ready for review and
+   relabels it `sveltia-cms/pending_review`.
+2. The **PR check** validates the content and builds the site. The **CMS publish gate** reports the
+   commit status `sveltia/workflow` = *pending* ("In review in the content editor — move it to
+   Ready to publish"); because that status is required by the branch rule, the PR **cannot be
+   merged yet** — by anyone.
+3. The manager opens the card in the editor's *In Review* lane, checks the preview and moves it to
+   **Ready** (label `sveltia-cms/pending_publish`). The gate re-runs: status *success*,
+   **squash-merge**, and the deploy workflow is dispatched. Two or three minutes later the site is
+   live and the card has left the board. The gate comments on the PR who approved it.
+4. If the PR check failed, the status is *failure* with a pointer to the log and nothing is merged;
+   fix the entry in the editor (a new save re-runs everything).
+
+Optional four-eyes rule: set the repository variable `CMS_REQUIRE_SECOND_REVIEWER=true` and the gate
+refuses a Ready label applied by the same GitHub account that created the draft (GitHub's PR
+timeline records who did what). Deletion requests (`sveltia-cms/pending_deletion`) are never
+auto-merged; a developer merges those on GitHub. Developers can of course still merge any CMS PR
+manually once its status is green.
 
 ### One pull request per entry — how the lanes map to GitHub
 
@@ -152,19 +184,41 @@ pull request, and the lane **is** the PR's label. Consequently:
 | Further saves of the same entry | new commits on the same branch / PR |
 | Move Draft → In Review ("Send for Review") | same PR: label → `sveltia-cms/pending_review`, draft → *ready for review* |
 | Move back to Draft | same PR: label → `sveltia-cms/draft`, *converted to draft* |
-| Reviewer approves + merges | PR merged, branch deleted, card disappears (= published) |
+| Move to **Ready** | same PR: label → `sveltia-cms/pending_publish`; the gate sets `sveltia/workflow` = success and **squash-merges** it; deploy runs; branch deleted; card disappears (= published) |
 | Discard (↶ on the card) | PR closed, branch deleted |
 
 A lane move never creates a second pull request (asserted by `npm run test:e2e`). A draft cannot
 exist *without* a PR — that is where Sveltia stores it — so "only open the PR at the end" is not an
-option with this CMS; the draft PR is the parking spot instead. Reviewers can ignore drafts
-entirely with the search `is:pr is:open draft:false` or by watching the
-`sveltia-cms/pending_review` label; GitHub also blocks merging a draft PR.
+option with this CMS; the draft PR is the parking spot instead, and the `sveltia/workflow` status
+keeps every Draft and In Review PR unmergeable until the editor says Ready.
+
+## Developer workflow between content updates
+
+Content PRs (`cms/…`) land on `main` continuously, so code work must start from a fresh `main`
+and never be pushed to `main` directly. Short version (full procedure in the TDD §12.3):
+
+```bash
+git switch main && git pull --ff-only          # start from what is deployed
+git switch -c fix/menu-badge-colour            # one branch per patch
+# … edit, npm run check, npm run test:e2e …
+git push -u origin HEAD                        # open a PR; the gate waves code PRs through once the PR check is green
+```
+
+* Nothing the tooling writes needs committing: `dist/`, `test-results/` (e2e screenshots) and
+  `node_modules/` are git-ignored; the committed documentation screenshots only change when you run
+  `UPDATE_SCREENSHOTS=1 npm run test:e2e` on purpose.
+* `git pull --rebase` refuses to run with local modifications. Commit them to your branch or
+  `git stash --include-untracked` first; `git config rebase.autoStash true` does that automatically.
+* Changes to the **content model** (new/moved `content/` folders, renamed collections) ship code and
+  content in the *same* PR, after the open CMS PRs have been published or discarded, and are
+  tested in GitHub mode only after that PR is on `main` (the editor reads the remote branch).
 
 ## Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
+| **Some collections show 0 entries in GitHub mode but are full in local mode** (e.g. Menu Items / Menu Sections after updating to v1.3). | The new `content/menu-items/` and `content/menu-sections/` folders exist in your working copy but not yet on the GitHub branch the editor reads. Commit and push (or merge) them to `main`, then reload. The editor now shows a *Content check* banner listing exactly which folders are missing on the branch. |
+| `…/admin` without a trailing slash shows the website instead of the editor. | Fixed in v1.5: `public/admin.html` redirects to `admin/` (keeping any `#/…` route) and the dev server redirects `/admin` → `/admin/`. |
 | The editor opens but **shows no existing content** — Blog Posts "0", Site Content files listed with empty fields, creating new items still works. | The editor is reading a branch that does not contain `content/`. Sveltia shows no error in this case. Check which branch holds `content/` on GitHub and make it the **default branch** (the editor follows the default branch; the deploy workflow publishes `main`, so that should be `main`). If the branch is right, clear a stale cache: sign out, then in the browser clear site data for the editor URL and sign in again. |
 | "You don't have access to the repository." | The GitHub account is not a collaborator with write access. |
 | "The branch has moved since the site data was loaded." | Someone committed to the branch meanwhile; reload the editor and redo the change. |
@@ -186,7 +240,8 @@ content/                    CMS-managed content: menu-items/, menu-sections/, bl
 docs/                       design document, manager guide, screenshots
 public/admin/logo.svg       editor logo / favicon
 scripts/validate-content.ts CI content validator (rules come from src/admin/config.ts)
-src/admin/                  Sveltia CMS bootstrap, typed config, site-themed skin, preview/ templates
+scripts/cms-publish-gate.mjs publishing gate used by cms-publish.yml (unit tests in tests/unit/)
+src/admin/                  Sveltia CMS bootstrap, typed config, site-themed skin, preview/ templates, content-source check
 src/components/             React UI (Markdown.tsx renders blog bodies safely; no link to the editor)
 src/content/index.ts        typed loader for everything under content/
 tests/e2e/                  offline end-to-end test + simulated GitHub API

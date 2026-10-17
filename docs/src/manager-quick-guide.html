@@ -49,7 +49,7 @@
     <div class="sub">Manager quick guide · Daily Menu · Blog · Dough announcement · Opening hours</div>
   </div>
   <div class="url">
-    Editor: <code>smagara.github.io/SlowDoughPizzaSite_Sveltia/admin/</code><br>
+    Editor: <a href="https://smagara.github.io/SlowDoughPizzaSite_Sveltia/admin" style="color:#8c3d1e"><code>smagara.github.io/SlowDoughPizzaSite_Sveltia/admin</code></a><br>
     Sign-in: your GitHub account (you must be a collaborator)<br>
     Works best in Chrome or Edge on a laptop
   </div>
@@ -70,8 +70,8 @@
     <b>How publishing works</b>
     <ul>
       <li>You edit and click <b>Save</b>, then <b>Send for Review</b>.</li>
-      <li>Each item you save becomes its own <i>pull request</i> on GitHub (a “Draft” one until you send it) — the live site is <b>not</b> changed yet.</li>
-      <li>A reviewer approves it; the website updates itself about 2–3 minutes later and the card leaves the board.</li>
+      <li>Each item you save becomes its own change request behind the scenes — the live site is <b>not</b> changed yet.</li>
+      <li>The manager checks it in the editor and moves it to <b>Ready</b>; the website updates itself 2–3 minutes later. Nobody needs to open GitHub.</li>
       <li>Nothing you do in the editor can break the live site — every change is checked and reviewed first.</li>
     </ul>
   </div>
@@ -82,7 +82,7 @@
   <div class="step">
     <h2><span class="num">1</span> Open the editor and sign in</h2>
     <p>The editor is <b>not linked from the website</b> (so visitors and search engines never see it). Type the address below once and <b>bookmark it</b>:</p>
-    <p class="addr">https://smagara.github.io/SlowDoughPizzaSite_Sveltia/admin/</p>
+    <p class="addr"><a href="https://smagara.github.io/SlowDoughPizzaSite_Sveltia/admin" style="color:inherit;text-decoration:none">https://smagara.github.io/SlowDoughPizzaSite_Sveltia/admin</a></p>
     <p>Click <b>Sign In with GitHub</b> and approve the request in the GitHub window. (If the site owner gave you an <i>access token</i> instead, use “Sign In Using Access Token” and paste it once — your browser remembers it, and next time the editor opens straight away.)</p>
     <img src="../images/guide/login.png" alt="Sign-in page" style="width:46%; margin:1.5mm auto 0;">
   </div>
@@ -109,9 +109,9 @@
   </div>
 
   <div class="step">
-    <h2><span class="num">5</span> Wait for approval — then it’s live</h2>
-    <p>The reviewer gets your change as a GitHub pull request, reads exactly what changed and approves it. The website rebuilds itself and your update appears a few minutes later — nothing more to do.</p>
-    <p>Follow progress on the <b>Editorial Workflow</b> board (branch icon, top of the editor): each card names the change, e.g. <i>Neapolitan Pizzas › Margherita — $21</i>. Use <b>Drafts</b> and <b>In Review</b> only; once merged, the card disappears and the change is live.</p>
+    <h2><span class="num">5</span> Ready = published</h2>
+    <p>The manager opens the card on the <b>Editorial Workflow</b> board (branch icon, top of the editor), checks the preview and moves it to <b>Ready</b>. That is the approval: the site rebuilds and the change is live a few minutes later — no GitHub needed.</p>
+    <p><b>Drafts</b> = saved, private · <b>In Review</b> = waiting for the manager · <b>Ready</b> = publishes automatically (manager only). Cards disappear once live; ↶ on a card takes it back.</p>
 
   </div>
  </div>
@@ -154,12 +154,12 @@
     <h2 class="section">If something looks wrong</h2>
     <table>
       <tr><th style="width:34%">What you see</th><th>What to do</th></tr>
-      <tr><td>My change is not on the website yet.</td><td>It has probably not been approved yet — check the Editorial Workflow board. After approval, allow 2–3 minutes and refresh the page (Ctrl/⌘ + Shift + R).</td></tr>
+      <tr><td>My change is not on the website yet.</td><td>If its card is still <i>In Review</i>, the manager has not moved it to <i>Ready</i>. After that allow 2–3 minutes and refresh (Ctrl/⌘ + Shift + R). A card stuck in Ready means a check failed — ask the developer.</td></tr>
       <tr><td>The editor opens but shows nothing to edit (empty lists or blank fields).</td><td>Don’t re-type everything — tell the site developer. The editor is reading a branch of the website project that has no content on it (a set-up issue, not your mistake).</td></tr>
       <tr><td>“You don’t have access to the repository.”</td><td>Your GitHub account is not a collaborator on the website repository. Ask the site owner to add you (Settings → Collaborators) and sign in again.</td></tr>
       <tr><td>“N fields have errors.”</td><td>Click <b>Show Errors</b>, fix the outlined fields (see the rules above) and Save again.</td></tr>
       <tr><td>Old text shown, or “the branch has moved”.</td><td>Reload the editor — it fetches the latest content. If someone else changed the same item, re-open it and redo your edit.</td></tr>
-      <tr><td>I want to change or undo something.</td><td>Still “In Review”: open the item again, edit and Save — the same request is updated; or discard it with the ↶ button on its card on the board. Already live: make the opposite change, or ask the reviewer to revert it on GitHub.</td></tr>
+      <tr><td>I want to change or undo something.</td><td>Still on the board: open the item, edit and Save (same request), or discard it with ↶ on its card. Already live: make the opposite change and send it through again.</td></tr>
 
     </table>
   </div>
@@ -167,7 +167,7 @@
 
 <div class="footer">
   <span><b>Good to know:</b> sign out (top-right menu) on a shared computer; never share your access token.</span>
-  <span style="white-space:nowrap">Quick guide v1.3 · Questions? Contact the site developer.</span>
+  <span style="white-space:nowrap">Quick guide v1.5 · Questions? Contact the site developer.</span>
 </div>
 
 </body>
