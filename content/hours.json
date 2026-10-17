@@ -8,9 +8,9 @@
     },
     {
       "day": "Tuesday",
-      "hours": "Closed",
-      "statusNote": "Long fermentation in progress (Batch 1)",
-      "isClosed": true
+      "hours": "11:00 AM - 2:00 PM",
+      "statusNote": "Long fermentation in progress",
+      "isClosed": false
     },
     {
       "day": "Wednesday",
