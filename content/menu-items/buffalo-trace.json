@@ -1,0 +1,13 @@
+{
+  "name": "Buffalo Trace",
+  "label": "Alcohol › Buffalo Trace — $15.66",
+  "section": "Alcohol",
+  "italianName": "Buffalo a Trace a",
+  "description": "Good sipping bourbon",
+  "price": 15.66,
+  "tags": [
+    "Traditional"
+  ],
+  "order": 1,
+  "visible": true
+}
