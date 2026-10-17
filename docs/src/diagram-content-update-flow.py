@@ -1,13 +1,15 @@
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 import math
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from diagram_common import OUT_DIR, font  # noqa: E402  (cross-platform fonts, output folder)
 
 W, H = 2880, 1500
 SCALE = 1
 img = Image.new("RGB", (W, H), "white")
 d = ImageDraw.Draw(img)
-def font(size, bold=False):
-    p = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-    return ImageFont.truetype(p, size)
 F = font(23); FB = font(26, True); FS = font(20); FL = font(28, True); FT = font(36, True)
 
 INK="#24211e"; TERRA="#c85a32"; SAND="#f0e7dc"; CREAM="#faf8f5"; LINE="#8c8278"; GREEN="#335928"; GREENBG="#e9f0e6"; REDBG="#fbeee8"
@@ -127,5 +129,5 @@ d.text((ex0 + 20, ey0 - 40), "errors → fix and retry", font=FS, fill=TERRA)
 rx0, ry0, rx1, ry1 = boxes["review"]
 d.text((rx0 - 300, ry0 + 60), "card appears in the\neditor’s “In Review” lane", font=FS, fill=LINE)
 
-img.save("content-update-flow.png")
-print("saved")
+img.save(OUT_DIR / "content-update-flow.png")
+print("saved", OUT_DIR / ("content-update-flow.png" if "flow" in __file__ else "architecture.png"))
