@@ -57,6 +57,7 @@ export const Footer: React.FC = () => {
         </div>
       </div>
     {/* Innocuous change to test git update */}
+    {/* 2nd change to test git update */}
     </footer>
   );
 };
