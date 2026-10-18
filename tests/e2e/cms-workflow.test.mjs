@@ -20,6 +20,9 @@
  *      start page instead of "Collection not found".
  *  10. When the GitHub branch lacks a configured content folder (e.g. content/menu-items not yet
  *      pushed) the editor shows a content-check banner naming the folders; never otherwise.
+ *  11. A new menu section must be published before dishes can use it: a draft section is not
+ *      offered in the item's section picker, and an item without a section can be parked as a
+ *      Draft but not sent for review (documented Sveltia behaviour under Editorial Workflow).
  *
  * GitHub's API is simulated in-process (github-mock.mjs) and wired in via Playwright request
  * interception, so no network, tokens or real repository are needed. Screenshots are written to
@@ -49,8 +52,13 @@ const HEADLESS = process.env.HEADED !== '1';
 
 // ---------------------------------------------------------------------------------- helpers
 const results = [];
+/** The page a scenario is currently driving (set by openEditor) and its browser console errors — reported when it fails. */
+let activePage;
+let consoleErrors = [];
 async function test(name, fn) {
   const started = Date.now();
+  activePage = undefined;
+  consoleErrors = [];
   try {
     await fn();
     results.push({ name, ok: true });
@@ -58,6 +66,12 @@ async function test(name, fn) {
   } catch (error) {
     results.push({ name, ok: false, error });
     console.log(`  ✖ ${name}\n    ${error.stack ?? error}`);
+    if (activePage && !activePage.isClosed()) {
+      const file = join(shotsDir, `FAILED-${results.length}.png`);
+      await activePage.screenshot({ path: file, fullPage: true }).catch(() => {});
+      console.log(`    page at the time of failure: ${activePage.url()}\n    screenshot: ${relative(root, file)}`);
+    }
+    for (const text of consoleErrors.slice(-8)) console.log(`    [browser console] ${text}`);
   }
 }
 
@@ -98,7 +112,11 @@ async function githubContext(browser, mock) {
 
 async function openEditor(ctx, baseUrl) {
   const page = await ctx.newPage();
+  activePage = page;
   page.on('pageerror', (e) => console.log('    [page error]', e.message));
+  page.on('console', (m) => {
+    if (m.type() === 'error') consoleErrors.push(m.text().slice(0, 300));
+  });
   await page.goto(`${baseUrl}/admin/`, { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: 'Work with Local Repository' }).waitFor();
   return page;
@@ -126,6 +144,61 @@ async function expandAll(page) {
 }
 
 const shot = (page, name) => page.screenshot({ path: join(shotsDir, `${name}.png`) });
+
+// The simulated GitHub is seeded from the real content/ folder, so the scenarios derive their
+// expectations from it instead of assuming fixed dishes, prices or hours (those change in real
+// use). Anything a scenario creates is named "E2E …" so it can never collide with real content.
+const readJson = (rel) => JSON.parse(readFileSync(join(root, rel), 'utf8'));
+const menuSections = readdirSync(join(root, 'content/menu-sections')).filter((f) => f.endsWith('.json')).map((f) => readJson(`content/menu-sections/${f}`));
+const menuItems = readdirSync(join(root, 'content/menu-items'))
+  .filter((f) => f.endsWith('.json'))
+  .map((f) => ({ slug: f.replace(/\.json$/, ''), ...readJson(`content/menu-items/${f}`) }));
+/** Same rule as the `label` compute field in src/admin/config.ts: {{section | truncate(28)}} › {{name}} — ${{price}} */
+const truncate = (text, n) => ([...text].length > n ? `${[...text].slice(0, n).join('')}…` : text);
+const itemLabel = (item, price = item.price) => `${truncate(item.section || '(no section yet)', 28)} › ${item.name} — $${price}`;
+const assertNoRealEntry = (folder, slug) => assert.ok(!existsSync(join(root, folder, `${slug}.json`)) && !existsSync(join(root, folder, `${slug}.md`)), `test fixture name collides with real content: ${folder}/${slug}`);
+
+/**
+ * Pick an option from the entry editor's "Status" menu (Draft / In Review / Ready).
+ *
+ * Sveltia's menu wires up its click handling about 100 ms after the menu opens. A click that
+ * lands earlier — which happens on fast machines or with OS "reduce motion" settings, where the
+ * popup appears instantly — is silently ignored and the menu simply stays open. So: open the
+ * menu, let it settle, click, and click again if the menu is still open. Never press Escape here:
+ * with no menu open, Escape closes the whole entry editor (Sveltia's "close with Escape" pref).
+ */
+async function chooseStatus(page, pattern) {
+  const statusButton = page.getByRole('button', { name: /Status/ });
+  await statusButton.waitFor({ timeout: 20000 });
+  await until(async () => !(await statusButton.isDisabled({ timeout: 2000 }).catch(() => true)), 'status control enabled');
+  const option = page.getByRole('menuitemradio', { name: pattern });
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    if ((await option.count()) === 0) await statusButton.click();
+    await option.waitFor({ timeout: 10000 });
+    await page.waitForTimeout(400); // menu click handling becomes active ~100 ms after it opens
+    await option.click();
+    try {
+      await option.waitFor({ state: 'hidden', timeout: 3000 }); // a registered click closes the menu
+      return;
+    } catch {
+      // ignored click — the menu is still open; click again
+    }
+  }
+  throw new Error(`the Status menu did not react to choosing ${pattern}`);
+}
+
+/** Change the workflow status from the entry editor's "Status" menu and wait for the PR relabel. */
+async function setStatus(page, mock, pattern, expectedLabel, branch) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    await chooseStatus(page, pattern);
+    try {
+      await until(() => mock.pulls.find((p) => p.head === branch)?.labels.includes(expectedLabel), `lane move to ${expectedLabel}`, 15000);
+      return;
+    } catch (error) {
+      if (attempt === 3) throw error;
+    }
+  }
+}
 
 /** The preview pane is an iframe that mounts slightly after the form — wait for it. */
 async function previewFrame(page) {
@@ -207,21 +280,27 @@ try {
     await page.waitForTimeout(500);
     await shot(page, '04-site-content');
 
-    await page.goto(`${baseUrl}/admin/#/collections/menu-items/entries/margherita-verace-d-o-p`);
+    // Work on the first real menu item that has a section and a numeric price (content-agnostic)
+    const item = menuItems.find((i) => i.section && typeof i.price === 'number' && i.visible !== false) ?? menuItems[0];
+    const newPrice = item.price + 2;
+    const ITEM_PATH = `content/menu-items/${item.slug}.json`;
+    const BRANCH = `cms/menu-items/${item.slug}`;
+
+    await page.goto(`${baseUrl}/admin/#/collections/menu-items/entries/${item.slug}`);
     await page.getByText('Italian name', { exact: true }).waitFor();
     await page.waitForTimeout(800);
     await shot(page, '05-menu-editor');
 
     // Site-styled preview template (rendered inside the preview iframe)
     const preview = await previewFrame(page);
-    assert.match(await preview.locator('.sd-h3').first().innerText(), /Neapolitan Pizzas/);
+    assert.equal(await preview.locator('.sd-h3').first().innerText(), item.section);
     assert.equal(await preview.locator('.sd-card-highlight').count(), 1, 'item card rendered');
 
     const price = page.getByLabel('Price (USD)').locator('input').first();
-    assert.equal(await price.inputValue(), '19'); // Margherita Verace
-    await price.fill('21');
+    assert.equal(Number(await price.inputValue()), item.price);
+    await price.fill(String(newPrice));
     await page.waitForTimeout(400);
-    assert.match(await preview.locator('.sd-price').first().innerText(), /21/, 'preview follows the price');
+    assert.ok((await preview.locator('.sd-price').first().innerText()).includes(String(newPrice)), 'preview follows the price');
     await shot(page, '06-menu-price-edited');
 
     await page.getByRole('button', { name: 'Save' }).click();
@@ -234,15 +313,17 @@ try {
       mock.log.map((l) => l.kind),
       ['branch.create', 'commit', 'pull.create', 'labels.add'],
     );
-    const BRANCH = 'cms/menu-items/margherita-verace-d-o-p';
     assert.equal(mock.log[0].branch, BRANCH);
-    assert.deepEqual(mock.log[1].additions, ['content/menu-items/margherita-verace-d-o-p.json']);
+    assert.deepEqual(mock.log[1].additions, [ITEM_PATH]);
     assert.equal(mock.log[2].base, 'main');
     assert.equal(mock.log[2].draft, true);
     assert.deepEqual(mock.log[3].labels, ['sveltia-cms/draft']);
 
     await dialog.click();
     await until(() => mock.pulls[0]?.labels.includes('sveltia-cms/pending_review') && !mock.pulls[0].draft, 'PR marked ready for review');
+    // The editor closes on its own after the save and routes back to the list, where the entry
+    // now carries an "In Review" badge. Wait for that before navigating on.
+    await page.waitForURL(/#\/collections\/menu-items$/, { timeout: 20000 });
     await page.getByText('In Review', { exact: true }).first().waitFor({ timeout: 20000 });
     await page.waitForTimeout(600);
     await shot(page, '08-entry-in-review');
@@ -251,36 +332,22 @@ try {
     assert.equal(pr.draft, false, 'PR is marked ready for review');
     assert.deepEqual(pr.labels, ['sveltia-cms/pending_review']);
     assert.equal(pr.head, BRANCH);
-    assert.equal(pr.title, 'content: update Menu Item “margherita-verace-d-o-p”');
-    assert.equal(
-      mock.branches.get('main').files.get('content/menu-items/margherita-verace-d-o-p.json'),
-      readFileSync(join(root, 'content/menu-items/margherita-verace-d-o-p.json'), 'utf8'),
-      'main is untouched',
-    );
+    assert.equal(pr.title, `content: update Menu Item “${item.slug}”`);
+    assert.equal(mock.branches.get('main').files.get(ITEM_PATH), readFileSync(join(root, ITEM_PATH), 'utf8'), 'main is untouched');
 
     // The committed JSON is well-formed, field-ordered, and the computed review label follows the price
-    const committed = mock.branches.get(BRANCH).files.get('content/menu-items/margherita-verace-d-o-p.json');
+    const committed = mock.branches.get(BRANCH).files.get(ITEM_PATH);
     const json = JSON.parse(committed);
-    assert.equal(json.price, 21);
+    assert.equal(json.price, newPrice);
     assert.equal(typeof json.price, 'number');
-    assert.equal(json.label, 'Neapolitan Pizzas (Pizze Nap… › Margherita Verace D.O.P. — $21');
+    assert.equal(json.label, itemLabel(item, newPrice));
     assert.deepEqual(Object.keys(json), ['name', 'label', 'section', 'italianName', 'description', 'price', 'tags', 'order', 'visible'], 'key order matches the committed files (clean diffs)');
 
     // Moving between lanes (In Review → Draft → In Review) relabels the SAME pull request
-    await page.goto(`${baseUrl}/admin/#/collections/menu-items/entries/margherita-verace-d-o-p`);
+    await page.goto(`${baseUrl}/admin/#/collections/menu-items/entries/${item.slug}`);
     await page.getByText('Italian name', { exact: true }).waitFor();
-    const statusButton = page.getByRole('button', { name: /Status/ });
-    await statusButton.waitFor({ timeout: 20000 });
-    for (const [status, label, expected] of [[/Draft/, /Status:\W*Draft/, 2], [/In Review/, /Status:\W*In Review/, 3]]) {
-      // The control is disabled while the previous relabel request is in flight — wait for it.
-      await until(async () => !(await statusButton.isDisabled()), 'status control enabled');
-      await statusButton.click();
-      const option = page.getByRole('menuitemradio', { name: status });
-      await option.waitFor({ timeout: 10000 });
-      await option.click();
-      await until(() => mock.log.filter((l) => l.kind === 'labels.set').length >= expected, `lane move to ${status} recorded`);
-      await until(async () => label.test(await statusButton.innerText()), `header shows ${label}`); // text contains Unicode isolates
-    }
+    await setStatus(page, mock, /Draft/, 'sveltia-cms/draft', BRANCH);
+    await setStatus(page, mock, /In Review/, 'sveltia-cms/pending_review', BRANCH);
     assert.equal(mock.pulls.length, 1, 'still exactly one pull request');
     assert.equal(mock.log.filter((l) => l.kind === 'pull.create').length, 1, 'no second PR was created by lane moves');
     assert.deepEqual(mock.pulls[0].labels, ['sveltia-cms/pending_review']);
@@ -295,10 +362,9 @@ try {
     await page.getByText('In Review', { exact: true }).first().waitFor();
     await page.waitForTimeout(600);
     await shot(page, '09-workflow-board');
-    const card = await page.locator('.card').first().innerText();
+    const card = (await page.locator('.card').first().innerText()).replace(/\s+/g, ' ');
     assert.match(card, /Menu Item/);
-    assert.match(card, /Neapolitan Pizzas/);
-    assert.match(card, /Margherita Verace D\.O\.P\. — \$21/);
+    assert.ok(card.includes(itemLabel(item, newPrice)), `card shows "${itemLabel(item, newPrice)}": ${card}`);
     assert.equal(await page.getByRole('button', { name: /^Publish/ }).count(), 0);
     await ctx.close();
   });
@@ -341,7 +407,8 @@ try {
     await page.goto(`${baseUrl}/admin/#/collections/blog/new`);
     await page.getByText('Excerpt', { exact: true }).waitFor();
 
-    await page.getByLabel('Title').locator('input').first().fill('Harvest Special: Pumpkin & Sage');
+    assertNoRealEntry('content/blog', 'e2e-harvest-special-pumpkin-sage');
+    await page.getByLabel('Title').locator('input').first().fill('E2E Harvest Special: Pumpkin & Sage');
     await page.getByLabel('Subtitle').locator('input').first().fill('A limited autumn pie, available while the squash lasts.');
     await page.getByLabel('Excerpt').locator('textarea').first().fill('Roasted pumpkin, brown butter, crispy sage and smoked scamorza on our 72-hour dough.');
     await page.getByRole('button', { name: /Add .*Takeaway/ }).click();
@@ -372,20 +439,20 @@ try {
     await page.getByRole('button', { name: 'Send for Review' }).click();
     await until(() => mock.pulls[0]?.labels.includes('sveltia-cms/pending_review'), 'blog PR sent for review');
 
-    const branch = 'cms/blog/harvest-special-pumpkin-sage';
+    const branch = 'cms/blog/e2e-harvest-special-pumpkin-sage';
     assert.ok(mock.branches.has(branch), `branch ${branch} exists`);
-    const path = 'content/blog/harvest-special-pumpkin-sage.md';
+    const path = 'content/blog/e2e-harvest-special-pumpkin-sage.md';
     const md = mock.branches.get(branch).files.get(path);
     assert.ok(md, 'markdown file committed');
     const parsed = parseMarkdownFile(md, path);
-    assert.equal(parsed.frontmatter.title, 'Harvest Special: Pumpkin & Sage');
+    assert.equal(parsed.frontmatter.title, 'E2E Harvest Special: Pumpkin & Sage');
     assert.equal(parsed.frontmatter.artType, 'dough');
     assert.match(String(parsed.frontmatter.date), /^\d{4}-\d{2}-\d{2}$/);
     assert.deepEqual(parsed.frontmatter.keyTakeaways, ['Available Wednesday to Sunday until the end of November.']);
     assert.ok(parsed.body.startsWith('## Why pumpkin?'), `heading written as Markdown:
 ${parsed.body}`);
     assert.ok(parsed.body.includes('> Brown butter'), 'quote written as Markdown');
-    assert.equal(mock.pulls[0].title, 'content: add Blog Post “harvest-special-pumpkin-sage”');
+    assert.equal(mock.pulls[0].title, 'content: add Blog Post “e2e-harvest-special-pumpkin-sage”');
     await ctx.close();
   });
 
@@ -410,11 +477,13 @@ ${parsed.body}`);
     const json = JSON.parse(mock.branches.get('cms/site/dough-announcement').files.get('content/announcement.json'));
     assert.equal(json.headline, "Today's Dough: 96-Hour Extended Ferment");
 
-    // Even the direct /assets route cannot upload anything (media library max_file_size: 0)
+    // Even the direct /assets route cannot upload anything (media library max_file_size: 0).
+    // First let the editor finish closing after the save (it routes back to the list on its own).
+    await page.waitForURL(/#\/collections\/site$/, { timeout: 20000 });
     await page.goto(`${baseUrl}/admin/#/assets`);
-    await page.reload({ waitUntil: 'networkidle' }); // hash-only navigation out of an open entry is not a full route change
+    await page.reload({ waitUntil: 'networkidle' }); // hash-only navigation is not a full route change
     const fileInput = page.locator('input[type=file]').first();
-    await fileInput.waitFor({ state: 'attached' });
+    await fileInput.waitFor({ state: 'attached', timeout: 20000 });
     await fileInput.setInputFiles({ name: 'photo.txt', mimeType: 'text/plain', buffer: Buffer.from('not allowed') });
     await page.getByText(/maximum size of .?.?0.? bytes/).waitFor(); // Unicode isolates around the number
     assert.equal(await page.getByRole('button', { name: 'Upload', exact: true }).last().isDisabled(), true, 'Upload button disabled');
@@ -448,14 +517,15 @@ ${parsed.body}`);
     const labels = await inputs.evaluateAll((els) => els.map((el) => document.getElementById(el.getAttribute('aria-labelledby'))?.textContent.trim()));
     const hoursIndexes = labels.map((l, i) => (l === 'Hours' ? i : -1)).filter((i) => i >= 0);
     assert.equal(hoursIndexes.length, 7, 'seven days rendered');
+    const hoursNow = readJson('content/hours.json');
     const wednesday = inputs.nth(hoursIndexes[2]);
     await wednesday.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-    assert.equal(await wednesday.inputValue(), '4:30 PM – 9:30 PM');
-    await wednesday.fill('5:00 PM – 9:30 PM');
+    assert.equal(await wednesday.inputValue(), hoursNow.days[2].hours);
+    await wednesday.fill('E2E 5:00 PM – 9:30 PM');
     await page.getByRole('button', { name: 'Save' }).click();
-    await until(async () => (await page.evaluate(() => window.__fakeFs.get('content/hours.json'))).includes('5:00 PM'), 'hours.json written to the working copy');
+    await until(async () => (await page.evaluate(() => window.__fakeFs.get('content/hours.json'))).includes('E2E 5:00 PM'), 'hours.json written to the working copy');
     const written = JSON.parse(await page.evaluate(() => window.__fakeFs.get('content/hours.json')));
-    assert.equal(written.days[2].hours, '5:00 PM – 9:30 PM');
+    assert.equal(written.days[2].hours, 'E2E 5:00 PM – 9:30 PM');
     assert.equal(written.days.length, 7);
     await ctx.close();
   });
@@ -482,6 +552,7 @@ ${parsed.body}`);
 
     // Public site
     const page = await ctx.newPage();
+    activePage = page;
     const cspViolations = [];
     page.on('console', (m) => { if (/Content Security Policy|Refused to/.test(m.text())) cspViolations.push(m.text()); });
     await page.goto(`${PAGES_ORIGIN}${BASE}`, { waitUntil: 'networkidle' });
@@ -517,6 +588,7 @@ ${parsed.body}`);
     const mock = new GitHubMock({ owner: OWNER, repo: REPO, rootDir: root, include: ['content'] });
     const ctx = await githubContext(browser, mock);
     const page = await ctx.newPage();
+    activePage = page;
     const warnings = [];
     page.on('console', (m) => { if (m.type() === 'warning') warnings.push(m.text()); });
     await page.goto(`${baseUrl}/admin/#/collections/settings`, { waitUntil: 'networkidle' });
@@ -548,6 +620,74 @@ ${parsed.body}`);
     await shot(page, '18-content-check-banner');
     await banner.getByRole('button', { name: 'Dismiss' }).click();
     assert.equal(await banner.count(), 0, 'banner can be dismissed');
+    await ctx.close();
+  });
+  // ------------------------------------------------------------------ 11. new section → new item ordering
+  await test('a draft menu section is not selectable for a new item; an item without a section stays a Draft', async () => {
+    const mock = new GitHubMock({ owner: OWNER, repo: REPO, rootDir: root, include: ['content'] });
+    const ctx = await githubContext(browser, mock);
+    const page = await openEditor(ctx, baseUrl);
+    await signInWithToken(page);
+    await page.getByText('Collections', { exact: true }).waitFor();
+
+    // Draft a new section (its own branch + draft PR)
+    await page.goto(`${baseUrl}/admin/#/collections/menu-sections/new`);
+    await page.getByText('Section title', { exact: true }).waitFor();
+    assertNoRealEntry('content/menu-sections', 'e2e-test-section');
+    assertNoRealEntry('content/menu-items', 'e2e-test-bourbon');
+    await page.getByLabel('Section title').locator('input').first().fill('E2E Test Section');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Later' }).click();
+    // The editor closes and routes back to the list once the save has fully completed — wait for
+    // that before navigating on, otherwise the late route change would yank the next page away.
+    await page.waitForURL(/#\/collections\/menu-sections$/, { timeout: 20000 });
+    await until(() => mock.pulls.some((p) => p.head === 'cms/menu-sections/e2e-test-section'), 'section draft PR created');
+
+    // New item: only the three *published* sections are offered, with the explanatory hint
+    await page.goto(`${baseUrl}/admin/#/collections/menu-items/new`);
+    await page.getByText('Italian name', { exact: true }).waitFor();
+    const sectionField = page.getByText('Menu section', { exact: true }).locator('xpath=ancestor::*[.//*[@role="radio"]][1]');
+    const offered = await sectionField.locator('[role=radio]').evaluateAll((els) => els.map((e) => e.closest('label, [role=none]')?.textContent.trim()));
+    assert.deepEqual(offered.sort(), menuSections.map((sct) => sct.title).sort(), 'only the published sections are offered (not the E2E draft)');
+    assert.equal(await page.getByRole('button', { name: /Add .*Menu Section/ }).count(), 0, 'no inline "Add" under Editorial Workflow');
+    await page.getByText(/Only sections that are already live/).first().waitFor(); // hint explains the ordering
+
+    // The item can be parked as a Draft without a section, but not sent for review
+    await page.getByLabel('Name').locator('input').first().fill('E2E Test Bourbon');
+    await page.getByLabel('Description').locator('textarea').first().fill('Good sipping bourbon');
+    await page.getByLabel('Price (USD)').locator('input').first().fill('15.5');
+    await page.waitForTimeout(500);
+    await page.getByRole('button', { name: 'Save' }).click();
+    await until(() => mock.branches.has('cms/menu-items/e2e-test-bourbon'), 'item draft committed');
+    assert.equal(await page.getByRole('button', { name: 'Send for Review' }).count(), 0, 'no Send-for-Review prompt for an incomplete draft');
+    // Wait for the save to finish completely (draft PR created, editor closed and routed back to the
+    // list) before re-opening the entry — otherwise the late route change yanks the editor away.
+    await until(() => mock.pulls.some((p) => p.head === 'cms/menu-items/e2e-test-bourbon'), 'item draft PR created');
+    await page.waitForURL(/#\/collections\/menu-items$/, { timeout: 20000 });
+    const committed = JSON.parse(mock.branches.get('cms/menu-items/e2e-test-bourbon').files.get('content/menu-items/e2e-test-bourbon.json'));
+    assert.equal(committed.label, '(no section yet) › E2E Test Bourbon — $15.5');
+    await page.goto(`${baseUrl}/admin/#/collections/menu-items/entries/e2e-test-bourbon`);
+    await page.getByText('Italian name', { exact: true }).waitFor();
+    // Try to move it to In Review from the status menu: Sveltia must refuse with a validation error
+    // (fail fast if the move actually went through — that would be a real regression).
+    const statusButton = page.getByRole('button', { name: /Status/ });
+    const requiredMessage = page.getByText('This field is required.').first();
+    let refused = false;
+    for (let attempt = 1; attempt <= 3 && !refused; attempt++) {
+      await chooseStatus(page, /In Review/);
+      try {
+        await requiredMessage.waitFor({ timeout: 8000 });
+        refused = true;
+      } catch {
+        const labels = mock.pulls.find((p) => p.head === 'cms/menu-items/e2e-test-bourbon')?.labels ?? [];
+        assert.ok(!labels.includes('sveltia-cms/pending_review'), 'an item without a section must not reach In Review');
+      }
+    }
+    assert.ok(refused, 'Sveltia shows "This field is required." for the missing section');
+    await page.waitForTimeout(500);
+    assert.match(await statusButton.innerText(), /Status:\W*Draft/, 'stays a Draft'); // text contains Unicode isolates
+    assert.deepEqual(mock.pulls.find((p) => p.head === 'cms/menu-items/e2e-test-bourbon').labels, ['sveltia-cms/draft']);
+    await shot(page, '19-item-needs-published-section');
     await ctx.close();
   });
 } finally {

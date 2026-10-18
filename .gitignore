@@ -156,3 +156,4 @@ test-results/
 __pycache__/
 /diagrams-graphvis-error.txt
 /requirements.txt
+build.txt

@@ -68,6 +68,13 @@ advertise the path).
   as an empty collection. After sign-in the editor verifies that every configured content
   folder/file exists on that branch and, if not, shows a banner naming them
   (`src/admin/content-check.ts`). Local mode reads the working copy and is unaffected.
+* **New menu section, then its dishes.** The section picker of a menu item only lists sections
+  that are already live. Create the section first, send it for review, have it set to Ready (live
+  a few minutes later), reload the editor, then add the dishes. Sveltia lets you park an incomplete
+  item as a Draft, but will not send it for review without a section, and the CI validator rejects
+  orphaned items. (In *local* mode the editor offers an inline “Add Menu Section” button and saves
+  both at once — that convenience is disabled by Sveltia under the Editorial Workflow, because a
+  draft is itself a pull request.)
 * **Sign-in is remembered.** After a successful sign-in the editor opens directly on the next visit;
   the login page — and with it the **Work with Local Repository** option on localhost — reappears
   after *Sign Out* (account menu, top right).
@@ -112,8 +119,11 @@ npm run check              # lint + validate + build
 
 `npm run test:e2e` drives the real editor in headless Chromium against an in-process **simulated
 GitHub API** (`tests/e2e/github-mock.mjs`) and a fake local file system, so the whole
-branch → commit → pull request → "send for review" flow is verified without network access. It also
-refreshes the screenshots in `docs/images/cms/`.
+branch → commit → pull request → "send for review" flow is verified without network access. The
+simulated repository is seeded from your current `content/` folder, and the scenarios derive their
+expectations from it (first menu item, current hours, published section titles), so real content
+changes — new dishes, new prices — never break the suite; anything a scenario creates is named
+`E2E …` so it cannot collide with real entries.
 
 > **First run:** the Playwright *package* is installed by `npm install`, but the browser binary is
 > not. Run `npm run test:e2e:setup` once (= `npx playwright install chromium`, ~150 MB); the test
@@ -218,6 +228,7 @@ git push -u origin HEAD                        # open a PR; the gate waves code 
 | Symptom | Cause / fix |
 |---|---|
 | **Some collections show 0 entries in GitHub mode but are full in local mode** (e.g. Menu Items / Menu Sections after updating to v1.3). | The new `content/menu-items/` and `content/menu-sections/` folders exist in your working copy but not yet on the GitHub branch the editor reads. Commit and push (or merge) them to `main`, then reload. The editor now shows a *Content check* banner listing exactly which folders are missing on the branch. |
+| A new Menu Section does not appear in the item's section picker. | The section is still a Draft / In Review (its own pull request). Publish it first (Ready → live), then reload the editor. See “New menu section, then its dishes” above. |
 | `…/admin` without a trailing slash shows the website instead of the editor. | Fixed in v1.5: `public/admin.html` redirects to `admin/` (keeping any `#/…` route) and the dev server redirects `/admin` → `/admin/`. |
 | The editor opens but **shows no existing content** — Blog Posts "0", Site Content files listed with empty fields, creating new items still works. | The editor is reading a branch that does not contain `content/`. Sveltia shows no error in this case. Check which branch holds `content/` on GitHub and make it the **default branch** (the editor follows the default branch; the deploy workflow publishes `main`, so that should be `main`). If the branch is right, clear a stale cache: sign out, then in the browser clear site data for the editor URL and sign in again. |
 | "You don't have access to the repository." | The GitHub account is not a collaborator with write access. |
@@ -226,6 +237,7 @@ git push -u origin HEAD                        # open a PR; the gate waves code 
 | `npm run build` prints "chunks are larger than 500 kB". | Expected for the editor entry (Sveltia CMS is a pre-built ~2 MB app; its sub-features are lazy chunks). `build.chunkSizeWarningLimit` is raised in `vite.config.ts` so the warning only fires for real regressions. |
 | `npm run build` prints `[PLUGIN_TIMINGS] JavaScript callbacks ran for …`. | An informational diagnostic from Rolldown (Vite 8's bundler) about time spent in JavaScript plugins — it is not an error. The project's own plugins use hook filters so they only run for the files they handle; the remaining time is the React and Tailwind plugins. Profile with `node --cpu-prof` if it grows. |
 | `npm run test:e2e` fails to start with a browser error. | Run `npm run test:e2e:setup` once. |
+| An e2e scenario fails on your machine but passes elsewhere. | Look at `test-results/screenshots/FAILED-<n>.png` (the page at the moment of failure) and the `[console error]` lines in the output. Known machine-dependent case (fixed in v1.7.2): Sveltia's menus ignore a click in their first ~100 ms, which an instant click on a fast machine or with OS animations turned off could hit — the suite now lets menus settle and retries. |
 | After signing in: empty page, **"Collection not found."** and a Back button. | The URL names a collection that does not exist (e.g. a bookmark like `…/admin/#/collections/settings` from an earlier configuration). Since v1.3 the editor drops such a hash on load and opens the start page (a `[admin] Unknown collection in URL` line is logged). If it still happens, open the plain editor URL without `#…`. |
 | Collection names clipped in the left sidebar ("Site Conte…") on a laptop-sized window. | Fixed in v1.3 (`src/admin/theme.css` gives the sidebar a minimum width). |
 | The "SLOW DOUGH" wordmark overlaps the logo border (Windows). | Fixed in v1.3 (`textLength` in `public/admin/logo.svg` forces the text to fit regardless of font metrics). |
